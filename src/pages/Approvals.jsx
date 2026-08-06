@@ -7,6 +7,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import ChatIcon from '@mui/icons-material/Chat';
 import { requestService } from '../services/requestService';
+import { chatService } from '../services/chatService';
 import { useAuth } from '../contexts/AuthContext';
 import StatusChip from '../components/common/StatusChip';
 import RequestChatModal from '../components/common/RequestChatModal';
@@ -62,6 +63,12 @@ const Approvals = () => {
   const handleOpenChat = (req) => {
     setSelectedReq(req);
     setChatModalOpen(true);
+  };
+
+  const handleChatRead = (requestId, readCount) => {
+    setRequests((prev) =>
+      prev.map((r) => (r.id === requestId ? { ...r, chatCount: readCount } : r))
+    );
   };
 
   const handleQtyChange = (itemId, val) => {
@@ -165,19 +172,28 @@ const Approvals = () => {
                     >
                       Approve
                     </Button>
-                    <Button
-                      variant={row.chatCount > 0 ? "contained" : "outlined"}
-                      size="small"
-                      color={row.chatCount > 0 ? "primary" : "inherit"}
-                      startIcon={
-                        <Badge badgeContent={row.chatCount} color="error" max={99}>
-                          <ChatIcon />
-                        </Badge>
-                      }
-                      onClick={() => handleOpenChat(row)}
-                    >
-                      Chat {row.chatCount > 0 && `(${row.chatCount})`}
-                    </Button>
+                    {(() => {
+                      const unreadCount = chatService.getUnreadCount(user?.id, row.id, row.chatCount);
+                      return (
+                        <Button
+                          variant={unreadCount > 0 ? "contained" : "outlined"}
+                          size="small"
+                          color={unreadCount > 0 ? "primary" : "inherit"}
+                          startIcon={
+                            unreadCount > 0 ? (
+                              <Badge badgeContent={unreadCount} color="error" max={99}>
+                                <ChatIcon />
+                              </Badge>
+                            ) : (
+                              <ChatIcon />
+                            )
+                          }
+                          onClick={() => handleOpenChat(row)}
+                        >
+                          Chat {unreadCount > 0 && `(${unreadCount})`}
+                        </Button>
+                      );
+                    })()}
                   </TableCell>
                 </TableRow>
               ))}
@@ -276,6 +292,7 @@ const Approvals = () => {
         open={chatModalOpen}
         onClose={() => setChatModalOpen(false)}
         request={selectedReq}
+        onRead={handleChatRead}
       />
     </Box>
   );

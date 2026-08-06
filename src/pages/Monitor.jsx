@@ -13,6 +13,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import { requestService } from '../services/requestService';
 import { slaService } from '../services/slaService';
+import { chatService } from '../services/chatService';
 import { useAuth } from '../contexts/AuthContext';
 import StatusChip from '../components/common/StatusChip';
 import TimelineView from '../components/common/TimelineView';
@@ -102,6 +103,19 @@ const Monitor = () => {
   const handleOpenChat = (req) => {
     setSelectedReq(req);
     setChatModalOpen(true);
+  };
+
+  const handleChatRead = (requestId, readCount) => {
+    setRequests((prev) =>
+      prev.map((r) => (r.id === requestId ? { ...r, chatCount: readCount } : r))
+    );
+    setDelayedOrders((prev) =>
+      prev.map((d) =>
+        d.request?.id === requestId
+          ? { ...d, request: { ...d.request, chatCount: readCount } }
+          : d
+      )
+    );
   };
 
   return (
@@ -237,19 +251,28 @@ const Monitor = () => {
                           >
                             Timeline
                           </Button>
-                          <Button
-                            size="small"
-                            variant={row.chatCount > 0 ? "contained" : "outlined"}
-                            color={row.chatCount > 0 ? "primary" : "inherit"}
-                            startIcon={
-                              <Badge badgeContent={row.chatCount} color="error" max={99}>
-                                <ChatIcon />
-                              </Badge>
-                            }
-                            onClick={() => handleOpenChat(row)}
-                          >
-                            Chat {row.chatCount > 0 && `(${row.chatCount})`}
-                          </Button>
+                          {(() => {
+                            const unreadCount = chatService.getUnreadCount(user?.id, row.id, row.chatCount);
+                            return (
+                              <Button
+                                size="small"
+                                variant={unreadCount > 0 ? "contained" : "outlined"}
+                                color={unreadCount > 0 ? "primary" : "inherit"}
+                                startIcon={
+                                  unreadCount > 0 ? (
+                                    <Badge badgeContent={unreadCount} color="error" max={99}>
+                                      <ChatIcon />
+                                    </Badge>
+                                  ) : (
+                                    <ChatIcon />
+                                  )
+                                }
+                                onClick={() => handleOpenChat(row)}
+                              >
+                                Chat {unreadCount > 0 && `(${unreadCount})`}
+                              </Button>
+                            );
+                          })()}
                         </TableCell>
                       </TableRow>
                     );
@@ -316,19 +339,28 @@ const Monitor = () => {
                           <Chip label={d.targetRole} variant="outlined" size="small" sx={{ fontWeight: 700 }} />
                         </TableCell>
                         <TableCell align="right">
-                          <Button
-                            size="small"
-                            variant="contained"
-                            color="error"
-                            startIcon={
-                              <Badge badgeContent={row.chatCount} color="warning" max={99}>
-                                <ChatIcon />
-                              </Badge>
-                            }
-                            onClick={() => handleOpenChat(row)}
-                          >
-                            Verify & Chat {row.chatCount > 0 && `(${row.chatCount})`}
-                          </Button>
+                          {(() => {
+                            const unreadCount = chatService.getUnreadCount(user?.id, row.id, row.chatCount);
+                            return (
+                              <Button
+                                size="small"
+                                variant={unreadCount > 0 ? "contained" : "outlined"}
+                                color={unreadCount > 0 ? "error" : "inherit"}
+                                startIcon={
+                                  unreadCount > 0 ? (
+                                    <Badge badgeContent={unreadCount} color="warning" max={99}>
+                                      <ChatIcon />
+                                    </Badge>
+                                  ) : (
+                                    <ChatIcon />
+                                  )
+                                }
+                                onClick={() => handleOpenChat(row)}
+                              >
+                                Verify & Chat {unreadCount > 0 && `(${unreadCount})`}
+                              </Button>
+                            );
+                          })()}
                         </TableCell>
                       </TableRow>
                     );
@@ -361,7 +393,7 @@ const Monitor = () => {
         <DialogContent sx={{ pt: 3 }}>
           {selectedReq && (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <TimelineView status={selectedReq.status} />
+              <TimelineView status={selectedReq.status} request={selectedReq} />
 
               {/* Key Actors Summary Card */}
               <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, backgroundColor: '#F7FAFC' }}>
@@ -451,6 +483,7 @@ const Monitor = () => {
         open={chatModalOpen}
         onClose={() => setChatModalOpen(false)}
         request={selectedReq}
+        onRead={handleChatRead}
       />
     </Box>
   );

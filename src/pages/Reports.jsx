@@ -553,7 +553,7 @@ const Reports = () => {
         <DialogContent sx={{ pt: 3 }}>
           {selectedReq && (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <TimelineView status={selectedReq.status} />
+              <TimelineView status={selectedReq.status} request={selectedReq} />
 
               <Box sx={{ display: 'flex', gap: 4, my: 1, flexWrap: 'wrap' }}>
                 <Typography variant="body1"><strong>Branch:</strong> {selectedReq.branch?.name}</Typography>

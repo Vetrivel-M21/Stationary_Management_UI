@@ -87,12 +87,14 @@ const Verification = () => {
   };
 
   const handleFieldChange = (itemId, field, valStr) => {
-    const val = parseInt(valStr, 10);
+    const cleanStr = String(valStr || '').replace(/^0+(?=\d)/, '');
+    const val = cleanStr === '' ? 0 : parseInt(cleanStr, 10);
+    const numVal = isNaN(val) ? 0 : Math.max(0, val);
     setVerificationData({
       ...verificationData,
       [itemId]: {
         ...verificationData[itemId],
-        [field]: isNaN(val) ? 0 : val,
+        [field]: cleanStr === '' ? '' : numVal,
       },
     });
   };
@@ -100,7 +102,12 @@ const Verification = () => {
   const handleSubmitVerification = async () => {
     setError('');
     try {
-      const itemsPayload = Object.values(verificationData);
+      const itemsPayload = Object.values(verificationData).map((item) => ({
+        ...item,
+        acceptedQty: Number(item.acceptedQty || 0),
+        damagedQty: Number(item.damagedQty || 0),
+        notReceivedQty: Number(item.notReceivedQty || 0),
+      }));
       const payload = {
         verificationNotes: notes,
         items: itemsPayload,
@@ -132,13 +139,13 @@ const Verification = () => {
         ) : (
           <Table>
             <TableHead>
-              <TableRow>
-                <TableCell>Request No</TableCell>
-                <TableCell>Destination Branch</TableCell>
-                <TableCell>Requester</TableCell>
-                <TableCell>Delivery Date</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell align="right">Action</TableCell>
+              <TableRow sx={{ backgroundColor: '#EBF8FF' }}>
+                <TableCell sx={{ fontWeight: 700 }}>Request No</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Branch</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Requester</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Delivered Date</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700 }}>Action</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -169,13 +176,13 @@ const Verification = () => {
 
       {/* Verification Dialog */}
       <Dialog open={verifyModalOpen} onClose={() => setVerifyModalOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ backgroundColor: '#1A202C', color: '#FFFFFF', fontWeight: 700 }}>
+        <DialogTitle sx={{ backgroundColor: '#1A202C', color: '#FFFFFF', fontWeight: 700, px: 3, py: 2 }}>
           Verify Receipt: {selectedReq?.requestNo} ({selectedReq?.branch?.name})
         </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        <DialogContent sx={{ pt: 3, pb: 2, px: 3 }}>
+          {error && <Alert severity="error" sx={{ mb: 2.5 }}>{error}</Alert>}
 
-          <Table size="small" sx={{ mb: 3 }}>
+          <Table size="small" sx={{ mt: 2, mb: 3 }}>
             <TableHead>
               <TableRow>
                 <TableCell>Product</TableCell>
@@ -225,7 +232,7 @@ const Verification = () => {
                         <TextField
                           type="number"
                           size="small"
-                          value={v.acceptedQty ?? 0}
+                          value={v.acceptedQty ?? ''}
                           onChange={(e) => handleFieldChange(lookupKey, 'acceptedQty', e.target.value)}
                         />
                       </TableCell>
@@ -233,7 +240,7 @@ const Verification = () => {
                         <TextField
                           type="number"
                           size="small"
-                          value={v.damagedQty ?? 0}
+                          value={v.damagedQty ?? ''}
                           onChange={(e) => handleFieldChange(lookupKey, 'damagedQty', e.target.value)}
                         />
                       </TableCell>
@@ -241,7 +248,7 @@ const Verification = () => {
                         <TextField
                           type="number"
                           size="small"
-                          value={v.notReceivedQty ?? 0}
+                          value={v.notReceivedQty ?? ''}
                           onChange={(e) => handleFieldChange(lookupKey, 'notReceivedQty', e.target.value)}
                         />
                       </TableCell>

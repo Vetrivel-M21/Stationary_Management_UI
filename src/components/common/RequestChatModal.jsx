@@ -31,7 +31,7 @@ const getTargetRoleName = (status) => {
   }
 };
 
-const RequestChatModal = ({ open, onClose, request }) => {
+const RequestChatModal = ({ open, onClose, request, onRead }) => {
   const { user } = useAuth();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
@@ -56,7 +56,12 @@ const RequestChatModal = ({ open, onClose, request }) => {
     try {
       const res = await chatService.getChatMessages(request.id);
       if (res.success) {
-        setMessages(res.data || []);
+        const loadedMsgs = res.data || [];
+        setMessages(loadedMsgs);
+        if (user?.id) {
+          chatService.markChatAsRead(user.id, request.id, loadedMsgs.length);
+          if (onRead) onRead(request.id, loadedMsgs.length);
+        }
       }
     } catch (err) {
       console.error('Failed to load chat messages:', err);
@@ -81,8 +86,13 @@ const RequestChatModal = ({ open, onClose, request }) => {
     try {
       const res = await chatService.sendChatMessage(request.id, newMessage.trim());
       if (res.success) {
-        setMessages((prev) => [...prev, res.data]);
+        const updated = [...messages, res.data];
+        setMessages(updated);
         setNewMessage('');
+        if (user?.id) {
+          chatService.markChatAsRead(user.id, request.id, updated.length);
+          if (onRead) onRead(request.id, updated.length);
+        }
         scrollToBottom();
       }
     } catch (err) {

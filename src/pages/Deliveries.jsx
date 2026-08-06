@@ -66,26 +66,28 @@ const Deliveries = () => {
 
   const handleFieldChange = (productId, field, valStr) => {
     const key = Number(productId);
+    const cleanStr = String(valStr || '').replace(/^0+(?=\d)/, '');
+
     if (field === 'unitPrice') {
-      const rawPrice = parseFloat(valStr);
+      const rawPrice = parseFloat(cleanStr);
       const priceVal = isNaN(rawPrice) ? 0 : Math.max(0, rawPrice);
       setItemDeliveries((prev) => ({
         ...prev,
         [key]: {
           ...prev[key],
-          unitPrice: priceVal,
+          unitPrice: cleanStr === '' ? '' : priceVal,
         },
       }));
       return;
     }
 
-    const rawVal = valStr === '' ? 0 : parseInt(valStr, 10);
+    const rawVal = cleanStr === '' ? 0 : parseInt(cleanStr, 10);
     const numVal = isNaN(rawVal) ? 0 : Math.max(0, rawVal);
     setItemDeliveries((prev) => ({
       ...prev,
       [key]: {
         ...prev[key],
-        [field]: numVal,
+        [field]: cleanStr === '' ? '' : numVal,
       },
     }));
   };
@@ -100,7 +102,7 @@ const Deliveries = () => {
     }
 
     const reader = new FileReader();
-    reader.onloadend = () => {
+    reader.onload = () => {
       setBillUrl(reader.result);
     };
     reader.readAsDataURL(file);
@@ -109,7 +111,12 @@ const Deliveries = () => {
   const handleSubmitDelivery = async () => {
     setError('');
     try {
-      const itemsPayload = Object.values(itemDeliveries);
+      const itemsPayload = Object.values(itemDeliveries).map((item) => ({
+        ...item,
+        deliveredQty: Number(item.deliveredQty || 0),
+        unavailableQty: Number(item.unavailableQty || 0),
+        unitPrice: Number(item.unitPrice || 0),
+      }));
       const payload = {
         deliveryNotes,
         billUrl,
@@ -129,8 +136,8 @@ const Deliveries = () => {
 
   // Calculate Grand Total for Delivery
   const grandTotal = Object.values(itemDeliveries).reduce((acc, curr) => {
-    const qty = curr.deliveredQty || 0;
-    const price = curr.unitPrice || 0;
+    const qty = Number(curr.deliveredQty || 0);
+    const price = Number(curr.unitPrice || 0);
     return acc + (qty * price);
   }, 0);
 
@@ -143,20 +150,16 @@ const Deliveries = () => {
       <Paper sx={{ width: '100%', overflow: 'hidden' }}>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>
-        ) : requests.length === 0 ? (
-          <Typography variant="body1" color="text.secondary" sx={{ p: 4, textAlign: 'center' }}>
-            No approved requests currently pending agency delivery.
-          </Typography>
         ) : (
           <Table>
             <TableHead>
-              <TableRow>
-                <TableCell>Request No</TableCell>
-                <TableCell>Destination Branch</TableCell>
-                <TableCell>Requester</TableCell>
-                <TableCell>Approval Date</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell align="right">Action</TableCell>
+              <TableRow sx={{ backgroundColor: '#EBF8FF' }}>
+                <TableCell sx={{ fontWeight: 700 }}>Request No</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Branch</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Requester</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Approval Date</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700 }}>Action</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -187,13 +190,13 @@ const Deliveries = () => {
 
       {/* Delivery Dialog */}
       <Dialog open={deliveryModalOpen} onClose={() => setDeliveryModalOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ backgroundColor: '#1A202C', color: '#FFFFFF', fontWeight: 700 }}>
+        <DialogTitle sx={{ backgroundColor: '#1A202C', color: '#FFFFFF', fontWeight: 700, px: 3, py: 2 }}>
           Record Delivery: {selectedReq?.requestNo} ({selectedReq?.branch?.name})
         </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        <DialogContent sx={{ pt: 3, pb: 2, px: 3 }}>
+          {error && <Alert severity="error" sx={{ mb: 2.5 }}>{error}</Alert>}
 
-          <Table size="small" sx={{ mb: 2 }}>
+          <Table size="small" sx={{ mt: 2, mb: 3 }}>
             <TableHead>
               <TableRow>
                 <TableCell>Product</TableCell>
@@ -215,9 +218,9 @@ const Deliveries = () => {
                   const pId = Number(item.productId || item.product?.id || item.id);
                   const delData = itemDeliveries[pId] || {};
                   const approvedQty = delData.approvedQty || 0;
-                  const deliveredQty = delData.deliveredQty !== undefined ? delData.deliveredQty : 0;
-                  const unavailableQty = delData.unavailableQty || 0;
-                  const unitPrice = delData.unitPrice !== undefined ? delData.unitPrice : (item.unitPrice || item.product?.unitPrice || 0);
+                  const deliveredQty = Number(delData.deliveredQty || 0);
+                  const unavailableQty = Number(delData.unavailableQty || 0);
+                  const unitPrice = Number(delData.unitPrice || 0);
                   const lineTotal = deliveredQty * unitPrice;
 
                   return (
@@ -229,7 +232,7 @@ const Deliveries = () => {
                           type="number"
                           size="small"
                           inputProps={{ min: 0, max: approvedQty }}
-                          value={delData.deliveredQty !== undefined ? delData.deliveredQty : approvedQty}
+                          value={delData.deliveredQty ?? ''}
                           onChange={(e) => handleFieldChange(pId, 'deliveredQty', e.target.value)}
                         />
                       </TableCell>
@@ -238,7 +241,7 @@ const Deliveries = () => {
                           type="number"
                           size="small"
                           inputProps={{ min: 0, max: approvedQty }}
-                          value={delData.unavailableQty !== undefined ? delData.unavailableQty : 0}
+                          value={delData.unavailableQty ?? ''}
                           onChange={(e) => handleFieldChange(pId, 'unavailableQty', e.target.value)}
                         />
                       </TableCell>
@@ -247,7 +250,7 @@ const Deliveries = () => {
                           type="number"
                           size="small"
                           inputProps={{ min: 0, step: 0.5 }}
-                          value={delData.unitPrice !== undefined ? delData.unitPrice : 0}
+                          value={delData.unitPrice ?? ''}
                           onChange={(e) => handleFieldChange(pId, 'unitPrice', e.target.value)}
                         />
                       </TableCell>

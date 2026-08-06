@@ -7,6 +7,8 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ChatIcon from '@mui/icons-material/Chat';
 import { requestService } from '../services/requestService';
+import { chatService } from '../services/chatService';
+import { useAuth } from '../contexts/AuthContext';
 import StatusChip from '../components/common/StatusChip';
 import TimelineView from '../components/common/TimelineView';
 import BillViewerModal from '../components/common/BillViewerModal';
@@ -14,6 +16,7 @@ import RequestChatModal from '../components/common/RequestChatModal';
 import { formatDate } from '../utils/formatters';
 
 const Requests = () => {
+  const { user } = useAuth();
   const [requests, setRequests] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -59,6 +62,12 @@ const Requests = () => {
   const handleOpenChat = (req) => {
     setSelectedReq(req);
     setChatModalOpen(true);
+  };
+
+  const handleChatRead = (requestId, readCount) => {
+    setRequests((prev) =>
+      prev.map((r) => (r.id === requestId ? { ...r, chatCount: readCount } : r))
+    );
   };
 
   const latestDelivery = selectedReq?.deliveries && selectedReq.deliveries.length > 0 
@@ -165,19 +174,28 @@ const Requests = () => {
                     >
                       Details
                     </Button>
-                    <Button
-                      variant={row.chatCount > 0 ? "contained" : "outlined"}
-                      size="small"
-                      color={row.chatCount > 0 ? "primary" : "inherit"}
-                      startIcon={
-                        <Badge badgeContent={row.chatCount} color="error" max={99}>
-                          <ChatIcon />
-                        </Badge>
-                      }
-                      onClick={() => handleOpenChat(row)}
-                    >
-                      Chat {row.chatCount > 0 && `(${row.chatCount})`}
-                    </Button>
+                    {(() => {
+                      const unreadCount = chatService.getUnreadCount(user?.id, row.id, row.chatCount);
+                      return (
+                        <Button
+                          variant={unreadCount > 0 ? "contained" : "outlined"}
+                          size="small"
+                          color={unreadCount > 0 ? "primary" : "inherit"}
+                          startIcon={
+                            unreadCount > 0 ? (
+                              <Badge badgeContent={unreadCount} color="error" max={99}>
+                                <ChatIcon />
+                              </Badge>
+                            ) : (
+                              <ChatIcon />
+                            )
+                          }
+                          onClick={() => handleOpenChat(row)}
+                        >
+                          Chat {unreadCount > 0 && `(${unreadCount})`}
+                        </Button>
+                      );
+                    })()}
                   </TableCell>
                 </TableRow>
               ))}
@@ -219,7 +237,7 @@ const Requests = () => {
         <DialogContent sx={{ pt: 3 }}>
           {selectedReq && (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <TimelineView status={selectedReq.status} />
+              <TimelineView status={selectedReq.status} request={selectedReq} />
 
               <Box sx={{ display: 'flex', gap: 3, mb: 1, flexWrap: 'wrap' }}>
                 <Typography variant="body2"><strong>Department:</strong> {selectedReq.department || 'GENERAL'}</Typography>
@@ -338,6 +356,7 @@ const Requests = () => {
         open={chatModalOpen}
         onClose={() => setChatModalOpen(false)}
         request={selectedReq}
+        onRead={handleChatRead}
       />
     </Box>
   );
