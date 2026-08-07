@@ -181,6 +181,7 @@ const Monitor = () => {
               <TableHead>
                 <TableRow sx={{ backgroundColor: '#EBF8FF' }}>
                   <TableCell sx={{ fontWeight: 700 }}>Request No</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Department</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Branch</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Applicant</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Submission Date</TableCell>
@@ -191,7 +192,7 @@ const Monitor = () => {
               <TableBody>
                 {requests.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 4, color: '#A0AEC0' }}>
+                    <TableCell colSpan={7} align="center" sx={{ py: 4, color: '#A0AEC0' }}>
                       No requests found for this department.
                     </TableCell>
                   </TableRow>
@@ -200,6 +201,9 @@ const Monitor = () => {
                     return (
                       <TableRow key={row.id} hover>
                         <TableCell sx={{ fontWeight: 700, color: '#2B6CB0' }}>{row.requestNo}</TableCell>
+                        <TableCell>
+                          <Chip label={row.department || 'GENERAL'} size="small" color="secondary" variant="outlined" sx={{ fontWeight: 700 }} />
+                        </TableCell>
                         <TableCell sx={{ fontWeight: 600 }}>{row.branch?.name || '-'}</TableCell>
                         <TableCell sx={{ fontWeight: 600 }}>{row.applicantName || row.requester?.name || '-'}</TableCell>
                         <TableCell>{formatDate(row.submittedAt)}</TableCell>
