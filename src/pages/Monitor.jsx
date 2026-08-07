@@ -78,7 +78,7 @@ const Monitor = () => {
     setLoading(true);
     try {
       const res = await slaService.getDelayedOrders(monitorDept);
-      if (res.success) {
+      if (res?.success) {
         setDelayedOrders(res.data || []);
       }
     } catch (err) {
