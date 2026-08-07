@@ -19,7 +19,7 @@ import StatusChip from '../components/common/StatusChip';
 import TimelineView from '../components/common/TimelineView';
 import BillViewerModal from '../components/common/BillViewerModal';
 import RequestChatModal from '../components/common/RequestChatModal';
-import { formatDate } from '../utils/formatters';
+import { formatDate, formatLocationDisplay } from '../utils/formatters';
 
 // Helper: get first approver name from request items
 const getApproverName = (req) => {
@@ -181,11 +181,8 @@ const Monitor = () => {
               <TableHead>
                 <TableRow sx={{ backgroundColor: '#EBF8FF' }}>
                   <TableCell sx={{ fontWeight: 700 }}>Request No</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Department</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Branch & Location</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Branch</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Applicant</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Approved By</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Delivered By</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Submission Date</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Actions</TableCell>
@@ -194,85 +191,56 @@ const Monitor = () => {
               <TableBody>
                 {requests.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} align="center" sx={{ py: 4, color: '#A0AEC0' }}>
+                    <TableCell colSpan={6} align="center" sx={{ py: 4, color: '#A0AEC0' }}>
                       No requests found for this department.
                     </TableCell>
                   </TableRow>
                 ) : (
                   requests.map((row) => {
-                    const approverName = getApproverName(row);
-                    const deliveredBy = getDeliveredByNames(row);
                     return (
                       <TableRow key={row.id} hover>
                         <TableCell sx={{ fontWeight: 700, color: '#2B6CB0' }}>{row.requestNo}</TableCell>
-                        <TableCell><Chip label={row.department || 'GENERAL'} size="small" sx={{ fontWeight: 700 }} /></TableCell>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>{row.branch?.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">{row.location || '-'}</Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <PersonIcon sx={{ fontSize: 14, color: '#718096' }} />
-                            <Box>
-                              <Typography variant="body2" sx={{ fontWeight: 600 }}>{row.applicantName || row.requester?.name}</Typography>
-                              <Typography variant="caption" color="text.secondary">{row.applicantMobile || row.requester?.mobile}</Typography>
-                            </Box>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          {approverName ? (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <VerifiedUserIcon sx={{ fontSize: 14, color: '#2F855A' }} />
-                              <Typography variant="body2" sx={{ color: '#2F855A', fontWeight: 600 }}>{approverName}</Typography>
-                            </Box>
-                          ) : (
-                            <Typography variant="body2" sx={{ color: '#A0AEC0', fontStyle: 'italic' }}>Pending</Typography>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {deliveredBy ? (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <LocalShippingIcon sx={{ fontSize: 14, color: '#744210' }} />
-                              <Typography variant="body2" sx={{ color: '#744210', fontWeight: 600 }}>{deliveredBy}</Typography>
-                            </Box>
-                          ) : (
-                            <Typography variant="body2" sx={{ color: '#A0AEC0', fontStyle: 'italic' }}>Not Delivered</Typography>
-                          )}
-                        </TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>{row.branch?.name || '-'}</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>{row.applicantName || row.requester?.name || '-'}</TableCell>
                         <TableCell>{formatDate(row.submittedAt)}</TableCell>
                         <TableCell><StatusChip status={row.status} /></TableCell>
-                        <TableCell align="right">
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<VisibilityIcon />}
-                            onClick={() => handleOpenTimeline(row.id)}
-                            sx={{ mr: 1 }}
-                          >
-                            Timeline
-                          </Button>
-                          {(() => {
-                            const unreadCount = chatService.getUnreadCount(user?.id, row.id, row.chatCount);
-                            return (
-                              <Button
-                                size="small"
-                                variant={unreadCount > 0 ? "contained" : "outlined"}
-                                color={unreadCount > 0 ? "primary" : "inherit"}
-                                startIcon={
-                                  unreadCount > 0 ? (
-                                    <Badge badgeContent={unreadCount} color="error" max={99}>
-                                      <ChatIcon />
-                                    </Badge>
-                                  ) : (
-                                    <ChatIcon />
-                                  )
-                                }
-                                onClick={() => handleOpenChat(row)}
-                              >
-                                Chat {unreadCount > 0 && `(${unreadCount})`}
-                              </Button>
-                            );
-                          })()}
+                        <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                          <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<VisibilityIcon />}
+                              onClick={() => handleOpenTimeline(row.id)}
+                            >
+                              Timeline
+                            </Button>
+                            {(() => {
+                              const unreadCount = chatService.getUnreadCount(user?.id, row.id, row.chatCount);
+                              return unreadCount > 0 ? (
+                                <Badge badgeContent={unreadCount} color="error" max={99}>
+                                  <Button
+                                    size="small"
+                                    variant="contained"
+                                    color="primary"
+                                    startIcon={<ChatIcon />}
+                                    onClick={() => handleOpenChat(row)}
+                                  >
+                                    Chat ({unreadCount})
+                                  </Button>
+                                </Badge>
+                              ) : (
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="inherit"
+                                  startIcon={<ChatIcon />}
+                                  onClick={() => handleOpenChat(row)}
+                                >
+                                  Chat
+                                </Button>
+                              );
+                            })()}
+                          </Box>
                         </TableCell>
                       </TableRow>
                     );
@@ -338,29 +306,43 @@ const Monitor = () => {
                         <TableCell>
                           <Chip label={d.targetRole} variant="outlined" size="small" sx={{ fontWeight: 700 }} />
                         </TableCell>
-                        <TableCell align="right">
-                          {(() => {
-                            const unreadCount = chatService.getUnreadCount(user?.id, row.id, row.chatCount);
-                            return (
-                              <Button
-                                size="small"
-                                variant={unreadCount > 0 ? "contained" : "outlined"}
-                                color={unreadCount > 0 ? "error" : "inherit"}
-                                startIcon={
-                                  unreadCount > 0 ? (
-                                    <Badge badgeContent={unreadCount} color="warning" max={99}>
-                                      <ChatIcon />
-                                    </Badge>
-                                  ) : (
-                                    <ChatIcon />
-                                  )
-                                }
-                                onClick={() => handleOpenChat(row)}
-                              >
-                                Verify & Chat {unreadCount > 0 && `(${unreadCount})`}
-                              </Button>
-                            );
-                          })()}
+                        <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                          <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<VisibilityIcon />}
+                              onClick={() => handleOpenTimeline(row.id)}
+                            >
+                              Timeline
+                            </Button>
+                            {(() => {
+                              const unreadCount = chatService.getUnreadCount(user?.id, row.id, row.chatCount);
+                              return unreadCount > 0 ? (
+                                <Badge badgeContent={unreadCount} color="error" max={99}>
+                                  <Button
+                                    size="small"
+                                    variant="contained"
+                                    color="error"
+                                    startIcon={<ChatIcon />}
+                                    onClick={() => handleOpenChat(row)}
+                                  >
+                                    Verify & Chat ({unreadCount})
+                                  </Button>
+                                </Badge>
+                              ) : (
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="inherit"
+                                  startIcon={<ChatIcon />}
+                                  onClick={() => handleOpenChat(row)}
+                                >
+                                  Verify & Chat
+                                </Button>
+                              );
+                            })()}
+                          </Box>
                         </TableCell>
                       </TableRow>
                     );
@@ -407,7 +389,7 @@ const Monitor = () => {
                         <Typography variant="body2" sx={{ fontWeight: 700, color: '#2D3748' }}>{selectedReq.applicantName || selectedReq.requester?.name}</Typography>
                         <Typography variant="caption" sx={{ color: '#718096', display: 'block' }}>{selectedReq.applicantMobile || selectedReq.requester?.mobile}</Typography>
                         <Typography variant="caption" sx={{ color: '#718096', display: 'block' }}>{selectedReq.applicantEmail || selectedReq.requester?.email}</Typography>
-                        <Typography variant="caption" sx={{ color: '#A0AEC0' }}>Dept: {selectedReq.department} | Loc: {selectedReq.location || '-'}</Typography>
+                        <Typography variant="caption" sx={{ color: '#A0AEC0' }}>Dept: {selectedReq.department} | Loc: {formatLocationDisplay(selectedReq.branch?.name, selectedReq.location)}</Typography>
                       </Box>
                     </Box>
                   </Grid>

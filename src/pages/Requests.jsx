@@ -13,7 +13,7 @@ import StatusChip from '../components/common/StatusChip';
 import TimelineView from '../components/common/TimelineView';
 import BillViewerModal from '../components/common/BillViewerModal';
 import RequestChatModal from '../components/common/RequestChatModal';
-import { formatDate } from '../utils/formatters';
+import { formatDate, formatLocationDisplay } from '../utils/formatters';
 
 const Requests = () => {
   const { user } = useAuth();
@@ -98,9 +98,10 @@ const Requests = () => {
       const unitPrice = agencyUnitPrice || item.unitPrice || item.product?.unitPrice || 0;
       totalRequestedOrderValue += (item.requestedQty || 0) * unitPrice;
 
-      const approvedQty = item.approvalItem ? item.approvalItem.approvedQty : item.requestedQty;
+      const isSubmitted = selectedReq.status === 'SUBMITTED';
+      const approvedQty = isSubmitted ? 0 : (item.approvalItem ? item.approvalItem.approvedQty : (item.approvedQty !== undefined ? item.approvedQty : 0));
       const isRemoved = item.approvalItem ? item.approvalItem.remove : false;
-      const effectiveApproved = isRemoved ? 0 : approvedQty;
+      const effectiveApproved = (isSubmitted || isRemoved) ? 0 : approvedQty;
       totalApprovedOrderValue += effectiveApproved * unitPrice;
       totalDeliveredOrderValue += itemDeliveredQty * unitPrice;
     });
@@ -156,7 +157,7 @@ const Requests = () => {
                   <TableCell><Chip label={row.department || 'GENERAL'} size="small" sx={{ fontWeight: 700 }} /></TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>{row.branch?.name}</Typography>
-                    <Typography variant="caption" color="text.secondary">{row.location || '-'}</Typography>
+                    <Typography variant="caption" color="text.secondary">{formatLocationDisplay(row.branch?.name, row.location)}</Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>{row.applicantName || row.requester?.name}</Typography>
@@ -164,38 +165,43 @@ const Requests = () => {
                   </TableCell>
                   <TableCell>{formatDate(row.submittedAt)}</TableCell>
                   <TableCell><StatusChip status={row.status} /></TableCell>
-                  <TableCell align="right">
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={<VisibilityIcon />}
-                      onClick={() => handleOpenDetails(row.id)}
-                      sx={{ mr: 1 }}
-                    >
-                      Details
-                    </Button>
-                    {(() => {
-                      const unreadCount = chatService.getUnreadCount(user?.id, row.id, row.chatCount);
-                      return (
-                        <Button
-                          variant={unreadCount > 0 ? "contained" : "outlined"}
-                          size="small"
-                          color={unreadCount > 0 ? "primary" : "inherit"}
-                          startIcon={
-                            unreadCount > 0 ? (
-                              <Badge badgeContent={unreadCount} color="error" max={99}>
-                                <ChatIcon />
-                              </Badge>
-                            ) : (
-                              <ChatIcon />
-                            )
-                          }
-                          onClick={() => handleOpenChat(row)}
-                        >
-                          Chat {unreadCount > 0 && `(${unreadCount})`}
-                        </Button>
-                      );
-                    })()}
+                  <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                    <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<VisibilityIcon />}
+                        onClick={() => handleOpenDetails(row.id)}
+                      >
+                        Details
+                      </Button>
+                      {(() => {
+                        const unreadCount = chatService.getUnreadCount(user?.id, row.id, row.chatCount);
+                        return unreadCount > 0 ? (
+                          <Badge badgeContent={unreadCount} color="error" max={99}>
+                            <Button
+                              variant="contained"
+                              size="small"
+                              color="primary"
+                              startIcon={<ChatIcon />}
+                              onClick={() => handleOpenChat(row)}
+                            >
+                              Chat ({unreadCount})
+                            </Button>
+                          </Badge>
+                        ) : (
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            color="inherit"
+                            startIcon={<ChatIcon />}
+                            onClick={() => handleOpenChat(row)}
+                          >
+                            Chat
+                          </Button>
+                        );
+                      })()}
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}
@@ -242,7 +248,7 @@ const Requests = () => {
               <Box sx={{ display: 'flex', gap: 3, mb: 1, flexWrap: 'wrap' }}>
                 <Typography variant="body2"><strong>Department:</strong> {selectedReq.department || 'GENERAL'}</Typography>
                 <Typography variant="body2"><strong>Branch:</strong> {selectedReq.branch?.name}</Typography>
-                <Typography variant="body2"><strong>Location:</strong> {selectedReq.location || '-'}</Typography>
+                <Typography variant="body2"><strong>Location:</strong> {formatLocationDisplay(selectedReq.branch?.name, selectedReq.location)}</Typography>
                 <Typography variant="body2"><strong>Applicant:</strong> {selectedReq.applicantName || selectedReq.requester?.name} ({selectedReq.applicantMobile || selectedReq.requester?.mobile})</Typography>
                 <Typography variant="body2"><strong>Status:</strong> <StatusChip status={selectedReq.status} /></Typography>
               </Box>
@@ -264,13 +270,15 @@ const Requests = () => {
                 </TableHead>
                 <TableBody>
                   {selectedReq.items?.map((item) => {
-                    const approvedQty = item.approvalItem ? item.approvalItem.approvedQty : item.requestedQty;
+                    const isSubmitted = selectedReq.status === 'SUBMITTED';
+                    const rawApproved = item.approvalItem ? item.approvalItem.approvedQty : (item.approvedQty !== undefined ? item.approvedQty : 0);
+                    const approvedQty = isSubmitted ? 0 : rawApproved;
                     const isRemoved = item.approvalItem ? item.approvalItem.remove : false;
-                    const isRejected = isRemoved || (item.approvalItem && approvedQty === 0);
+                    const isRejected = !isSubmitted && (isRemoved || (item.approvalItem && rawApproved === 0));
                     
                     let deliveredQty = 0;
                     let agencyUnitPrice = 0;
-                    if (!isRejected && selectedReq.deliveries && selectedReq.deliveries.length > 0) {
+                    if (!isSubmitted && !isRejected && selectedReq.deliveries && selectedReq.deliveries.length > 0) {
                       selectedReq.deliveries.forEach((d) => {
                         (d.items || []).forEach((di) => {
                           const diProdId = Number(di.productId || di.product?.id);
@@ -287,11 +295,13 @@ const Requests = () => {
 
                     const unitPrice = agencyUnitPrice || item.unitPrice || item.product?.unitPrice || 0;
 
-                    const effectiveApproved = isRejected ? 0 : approvedQty;
+                    const effectiveApproved = (isSubmitted || isRejected) ? 0 : approvedQty;
                     const lineApprovedTotal = effectiveApproved * unitPrice;
 
                     let remarkText = item.approvalItem?.remarks || '-';
-                    if (isRejected && (!item.approvalItem?.remarks || item.approvalItem.remarks === '-')) {
+                    if (isSubmitted) {
+                      remarkText = 'Awaiting Approver Review';
+                    } else if (isRejected && (!item.approvalItem?.remarks || item.approvalItem.remarks === '-')) {
                       remarkText = 'Rejected by Approver';
                     }
 
@@ -300,16 +310,16 @@ const Requests = () => {
                         <TableCell sx={{ fontWeight: 600 }}>{item.product?.name}</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 600 }}>₹{unitPrice.toFixed(2)}</TableCell>
                         <TableCell>{item.requestedQty}</TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: isRejected ? '#C53030' : 'inherit' }}>
-                          {isRejected ? '0 (Rejected)' : approvedQty}
+                        <TableCell sx={{ fontWeight: 600, color: isSubmitted ? '#D69E2E' : isRejected ? '#C53030' : 'inherit', fontStyle: isSubmitted ? 'italic' : 'normal' }}>
+                          {isSubmitted ? 'Pending Approval' : isRejected ? '0 (Rejected)' : approvedQty}
                         </TableCell>
-                        <TableCell sx={{ color: isRejected ? 'text.disabled' : '#2F855A', fontWeight: 600 }}>
-                          {isRejected ? 0 : deliveredQty}
+                        <TableCell sx={{ color: isSubmitted || isRejected ? 'text.disabled' : '#2F855A', fontWeight: 600 }}>
+                          {isSubmitted || isRejected ? 0 : deliveredQty}
                         </TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 700, color: '#2B6CB0' }}>
-                          ₹{lineApprovedTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        <TableCell align="right" sx={{ fontWeight: 700, color: isSubmitted ? 'text.secondary' : '#2B6CB0' }}>
+                          {isSubmitted ? '-' : `₹${lineApprovedTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
                         </TableCell>
-                        <TableCell sx={{ fontStyle: isRejected ? 'italic' : 'normal', color: isRejected ? '#C53030' : 'inherit' }}>
+                        <TableCell sx={{ fontStyle: isSubmitted || isRejected ? 'italic' : 'normal', color: isSubmitted ? '#D69E2E' : isRejected ? '#C53030' : 'inherit' }}>
                           {remarkText}
                         </TableCell>
                       </TableRow>
@@ -329,9 +339,15 @@ const Requests = () => {
                 </Box>
                 <Box sx={{ textAlign: 'right' }}>
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>TOTAL APPROVED ORDER AMOUNT</Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 800, color: '#2B6CB0' }}>
-                    ₹{totalApprovedOrderValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </Typography>
+                  {selectedReq.status === 'SUBMITTED' ? (
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#D69E2E', fontStyle: 'italic' }}>
+                      Pending Approval
+                    </Typography>
+                  ) : (
+                    <Typography variant="h5" sx={{ fontWeight: 800, color: '#2B6CB0' }}>
+                      ₹{totalApprovedOrderValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </Typography>
+                  )}
                 </Box>
               </Box>
             </Box>

@@ -164,10 +164,11 @@ const Branches = () => {
             <TextField
               label="Address"
               multiline
-              rows={3}
+              rows={6}
               fullWidth
               value={form.address}
               onChange={(e) => setForm({ ...form, address: e.target.value })}
+              placeholder="Enter full physical address, landmark, street, city, pin code..."
             />
           </DialogContent>
           <DialogActions sx={{ p: 2 }}>

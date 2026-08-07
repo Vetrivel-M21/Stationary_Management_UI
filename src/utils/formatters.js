@@ -20,3 +20,19 @@ export const formatDateTime = (dateInput) => {
   const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   return `${day}/${month}/${year} ${time}`;
 };
+
+export const formatLocationDisplay = (branchName, locationStr) => {
+  if (!locationStr) return '-';
+  let cleaned = locationStr.trim();
+  if (branchName) {
+    const bName = branchName.trim();
+    if (cleaned.toLowerCase().startsWith(`${bName.toLowerCase()} - `)) {
+      cleaned = cleaned.substring(bName.length + 3).trim();
+    } else if (cleaned.toLowerCase().startsWith(`${bName.toLowerCase()}-`)) {
+      cleaned = cleaned.substring(bName.length + 1).trim();
+    } else if (cleaned.toLowerCase() === bName.toLowerCase()) {
+      return '-';
+    }
+  }
+  return cleaned || '-';
+};
