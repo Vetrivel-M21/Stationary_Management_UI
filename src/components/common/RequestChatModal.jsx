@@ -10,6 +10,8 @@ import StatusChip from './StatusChip';
 import { chatService } from '../../services/chatService';
 import { useAuth } from '../../contexts/AuthContext';
 
+import { formatDate } from '../../utils/formatters';
+
 const getRoleColor = (role) => {
   switch (role) {
     case 'ADMIN': return '#9B2C2C';
@@ -29,6 +31,50 @@ const getTargetRoleName = (status) => {
     case 'DELIVERED': return 'Branch Requester';
     default: return 'Department Monitor';
   }
+};
+
+const isSameDay = (d1, d2) => {
+  if (!d1 || !d2) return false;
+  const date1 = new Date(d1);
+  const date2 = new Date(d2);
+  return (
+    date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate()
+  );
+};
+
+const formatDateDivider = (dateString) => {
+  if (!dateString) return '';
+  const msgDate = new Date(dateString);
+  if (isNaN(msgDate.getTime())) return '';
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  const dateFormatted = formatDate(msgDate);
+  if (isSameDay(msgDate, today)) {
+    return `Today (${dateFormatted})`;
+  }
+  if (isSameDay(msgDate, yesterday)) {
+    return `Yesterday (${dateFormatted})`;
+  }
+  return dateFormatted;
+};
+
+const formatMessageTime = (dateString) => {
+  if (!dateString) return '';
+  const msgDate = new Date(dateString);
+  if (isNaN(msgDate.getTime())) return '';
+  const today = new Date();
+  const isToday = isSameDay(msgDate, today);
+
+  const timeStr = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (isToday) {
+    return timeStr;
+  }
+  const dateStr = formatDate(msgDate);
+  return `${dateStr}, ${timeStr}`;
 };
 
 const RequestChatModal = ({ open, onClose, request, onRead }) => {
@@ -117,6 +163,9 @@ const RequestChatModal = ({ open, onClose, request, onRead }) => {
         {request && (
           <Typography variant="caption" sx={{ color: '#A0AEC0', display: 'block', mt: 0.5 }}>
             Department: <strong>{request.department || 'GENERAL'}</strong> | Branch: <strong>{request.branch?.name || '-'}</strong> | Applicant: <strong>{request.applicantName || request.requester?.name || '-'}</strong>
+            {messages.length > 0 && (
+              <> | Chat Started: <strong>{formatDate(messages[0].createdAt)}</strong></>
+            )}
           </Typography>
         )}
       </DialogTitle>
@@ -141,70 +190,96 @@ const RequestChatModal = ({ open, onClose, request, onRead }) => {
               <Typography variant="caption">Send a message below to start communicating with the status owner.</Typography>
             </Box>
           ) : (
-            messages.map((msg) => {
+            messages.map((msg, index) => {
               const isMe = Number(msg.senderId) === Number(user?.id) || (user?.name && msg.senderName === user.name);
+              const showDateDivider = index === 0 || !isSameDay(messages[index - 1].createdAt, msg.createdAt);
+              const fullDateTooltip = new Date(msg.createdAt).toLocaleString([], {
+                dateStyle: 'full',
+                timeStyle: 'medium',
+              });
+
               return (
-                <Box
-                  key={msg.id}
-                  sx={{
-                    display: 'flex',
-                    gap: 1,
-                    alignItems: 'flex-start',
-                    flexDirection: isMe ? 'row-reverse' : 'row',
-                    maxWidth: '85%',
-                    alignSelf: isMe ? 'flex-end' : 'flex-start',
-                  }}
-                >
-                  <Avatar
-                    sx={{
-                      width: 32,
-                      height: 32,
-                      bgcolor: isMe ? '#2B6CB0' : getRoleColor(msg.senderRole),
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                    }}
-                  >
-                    {isMe ? (user?.name?.[0] || 'Y') : (msg.senderName?.[0] || 'U')}
-                  </Avatar>
-                  <Paper
-                    elevation={0}
-                    variant="outlined"
-                    sx={{
-                      p: 1.5,
-                      borderRadius: 2,
-                      backgroundColor: isMe ? '#2B6CB0' : '#FFFFFF',
-                      color: isMe ? '#FFFFFF' : '#2D3748',
-                      borderColor: isMe ? '#2B6CB0' : '#E2E8F0',
-                      borderTopRightRadius: isMe ? 0 : 8,
-                      borderTopLeftRadius: isMe ? 8 : 0,
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: isMe ? '#FFFFFF' : '#2D3748' }}>
-                          {isMe ? 'You' : msg.senderName}
-                        </Typography>
-                        <Chip
-                          label={msg.senderRole}
-                          size="small"
-                          sx={{
-                            height: 18,
-                            fontSize: '0.65rem',
-                            backgroundColor: isMe ? '#4299E1' : getRoleColor(msg.senderRole),
-                            color: '#FFF',
-                            fontWeight: 700,
-                          }}
-                        />
-                      </Box>
-                      <Typography variant="caption" sx={{ color: isMe ? '#E2E8F0' : '#A0AEC0' }}>
-                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </Typography>
+                <React.Fragment key={msg.id || index}>
+                  {showDateDivider && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', my: 1 }}>
+                      <Divider sx={{ flexGrow: 1, borderColor: '#CBD5E0' }} />
+                      <Chip
+                        label={`📅 ${formatDateDivider(msg.createdAt)}`}
+                        size="small"
+                        sx={{
+                          mx: 1.5,
+                          backgroundColor: '#EDF2F7',
+                          color: '#4A5568',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          border: '1px solid #CBD5E0',
+                          height: 22,
+                        }}
+                      />
+                      <Divider sx={{ flexGrow: 1, borderColor: '#CBD5E0' }} />
                     </Box>
-                    <Typography variant="body2" sx={{ color: isMe ? '#FFFFFF' : '#4A5568', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
-                      {msg.message}
-                    </Typography>
-                  </Paper>
-                </Box>
+                  )}
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      gap: 1,
+                      alignItems: 'flex-start',
+                      flexDirection: isMe ? 'row-reverse' : 'row',
+                      maxWidth: '85%',
+                      alignSelf: isMe ? 'flex-end' : 'flex-start',
+                    }}
+                  >
+                    <Avatar
+                      sx={{
+                        width: 32,
+                        height: 32,
+                        bgcolor: isMe ? '#2B6CB0' : getRoleColor(msg.senderRole),
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {isMe ? (user?.name?.[0] || 'Y') : (msg.senderName?.[0] || 'U')}
+                    </Avatar>
+                    <Paper
+                      elevation={0}
+                      variant="outlined"
+                      sx={{
+                        p: 1.5,
+                        borderRadius: 2,
+                        backgroundColor: isMe ? '#2B6CB0' : '#FFFFFF',
+                        color: isMe ? '#FFFFFF' : '#2D3748',
+                        borderColor: isMe ? '#2B6CB0' : '#E2E8F0',
+                        borderTopRightRadius: isMe ? 0 : 8,
+                        borderTopLeftRadius: isMe ? 8 : 0,
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: isMe ? '#FFFFFF' : '#2D3748' }}>
+                            {isMe ? 'You' : msg.senderName}
+                          </Typography>
+                          <Chip
+                            label={msg.senderRole}
+                            size="small"
+                            sx={{
+                              height: 18,
+                              fontSize: '0.65rem',
+                              backgroundColor: isMe ? '#4299E1' : getRoleColor(msg.senderRole),
+                              color: '#FFF',
+                              fontWeight: 700,
+                            }}
+                          />
+                        </Box>
+                        <Typography variant="caption" title={fullDateTooltip} sx={{ color: isMe ? '#E2E8F0' : '#718096', fontSize: '0.7rem', fontWeight: 500 }}>
+                          {formatMessageTime(msg.createdAt)}
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2" sx={{ color: isMe ? '#FFFFFF' : '#4A5568', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
+                        {msg.message}
+                      </Typography>
+                    </Paper>
+                  </Box>
+                </React.Fragment>
               );
             })
           )}

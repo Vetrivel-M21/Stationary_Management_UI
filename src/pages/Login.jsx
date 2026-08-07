@@ -17,18 +17,28 @@ const Login = () => {
   const handleTabChange = (event, newValue) => {
     setTabIndex(newValue);
     setError('');
-    if (newValue === 1) {
-      setMobile('09666666666'); // Pre-fill default Agency mobile
-    } else {
-      setMobile('');
-    }
+    setMobile('');
+  };
+
+  const handleMobileChange = (val) => {
+    // Only allow digits up to 11 characters (10-digit number or 11-digit number starting with 0)
+    const digits = val.replace(/\D/g, '').slice(0, 10);
+    setMobile(digits);
+    if (error) setError('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    const cleanMobile = mobile.trim().replace(/\D/g, '');
+    if (!cleanMobile || cleanMobile.length !== 10) {
+      setError('Please enter a valid 10-digit Mobile Number.');
+      return;
+    }
+
     try {
-      const user = await login(mobile.trim(), password);
+      const user = await login(cleanMobile, password);
       
       // Role & Department based redirection
       if (user?.role?.name === 'AGENCY') {
@@ -82,8 +92,9 @@ const Login = () => {
           fullWidth
           required
           value={mobile}
-          onChange={(e) => setMobile(e.target.value)}
-          placeholder="e.g. 09999999999"
+          onChange={(e) => handleMobileChange(e.target.value)}
+          placeholder="e.g. 9876543210"
+          inputProps={{ maxLength: 10, inputMode: 'numeric', pattern: '[0-9]*' }}
         />
         <TextField
           label="Password"
@@ -104,29 +115,6 @@ const Login = () => {
         >
           {loading ? <CircularProgress size={26} color="inherit" /> : (tabIndex === 0 ? 'Staff Sign In' : 'Agency Sign In')}
         </Button>
-      </Box>
-
-      <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid #CBD5E0', textAlign: 'left' }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#2D3748', mb: 1 }}>
-          Click to Quick-Fill Test Account (Password: Admin@123):
-        </Typography>
-        
-        {tabIndex === 0 ? (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8 }}>
-            <Chip label="Admin" onClick={() => quickFill('09999999999')} size="small" color="primary" clickable />
-            <Chip label="Requester (Shared)" onClick={() => quickFill('09888888888')} size="small" color="secondary" clickable />
-            <Chip label="Approver (Gold Loan)" onClick={() => quickFill('09777777777')} size="small" color="success" clickable />
-            <Chip label="Approver (Chit Fund)" onClick={() => quickFill('09777777778')} size="small" color="success" clickable />
-            <Chip label="Approver (Others)" onClick={() => quickFill('09777777779')} size="small" color="success" clickable />
-            <Chip label="Monitor (Gold Loan)" onClick={() => quickFill('09555555555')} size="small" color="info" clickable />
-            <Chip label="Monitor (Chit Fund)" onClick={() => quickFill('09555555556')} size="small" color="info" clickable />
-            <Chip label="Monitor (Others)" onClick={() => quickFill('09555555557')} size="small" color="info" clickable />
-          </Box>
-        ) : (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8 }}>
-            <Chip label="Delivery Agency (09666666666)" onClick={() => quickFill('09666666666')} size="small" color="warning" clickable />
-          </Box>
-        )}
       </Box>
     </LoginLayout>
   );

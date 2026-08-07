@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Box, Typography, Button, TextField, Table, TableHead, TableRow, TableCell, TableBody,
   Paper, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, FormControl, InputLabel,
-  Select, MenuItem, TablePagination, CircularProgress, Alert, Chip
+  Select, MenuItem, TablePagination, CircularProgress, Alert, Chip, FormHelperText
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -37,18 +37,30 @@ const Users = () => {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [userToDelete, setUserToDelete] = useState(null);
+  const [resetPasswordVal, setResetPasswordVal] = useState('User@123');
 
   const [form, setForm] = useState({
-    name: '', email: '', mobile: '', defaultPassword: 'User@123', roleId: 2, branchId: '', department: 'GOLD LOAN', approverAccessType: 'ALL_BRANCHES', status: 'ACTIVE'
+    name: '',
+    email: '',
+    mobile: '',
+    defaultPassword: 'User@123',
+    roleId: 2,
+    branchId: '',
+    department: 'GOLD LOAN',
+    approverAccessType: 'ALL_BRANCHES',
+    status: 'ACTIVE'
   });
-  const [resetPasswordVal, setResetPasswordVal] = useState('Admin@123');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
     fetchUsers();
-    fetchBranches();
   }, [page, rowsPerPage, search]);
+
+  useEffect(() => {
+    fetchBranches();
+  }, []);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -72,12 +84,13 @@ const Users = () => {
         setBranches(res.data.branches || []);
       }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load branches for dropdown:', err);
     }
   };
 
   const handleOpenModal = (u = null) => {
     setError('');
+    setFieldErrors({});
     if (u) {
       setSelectedUser(u);
       setForm({
@@ -100,13 +113,60 @@ const Users = () => {
     setModalOpen(true);
   };
 
+  const handleInputChange = (field, value) => {
+    let sanitizedValue = value;
+    if (field === 'mobile') {
+      sanitizedValue = value.replace(/\D/g, '').slice(0, 10);
+    }
+    setForm((prev) => ({ ...prev, [field]: sanitizedValue }));
+    if (fieldErrors[field]) {
+      setFieldErrors((prev) => ({ ...prev, [field]: '' }));
+    }
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     setError('');
+    const newErrors = {};
+
+    if (!form.name || !form.name.trim()) {
+      newErrors.name = 'Full Name is required';
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!form.email || !form.email.trim()) {
+      newErrors.email = 'Email Address / User ID is required';
+    } else if (!emailRegex.test(form.email.trim())) {
+      newErrors.email = 'Enter a valid Email Address (e.g. user@company.com)';
+    }
+
+    const cleanMobile = (form.mobile || '').trim().replace(/[\s-]/g, '');
+    if (!cleanMobile) {
+      newErrors.mobile = 'Mobile Number is required';
+    } else if (!/^\d{10}$/.test(cleanMobile)) {
+      newErrors.mobile = 'Enter a valid 10-digit Mobile Number (e.g. 9876543210)';
+    }
+
+    if (!selectedUser && (!form.defaultPassword || !form.defaultPassword.trim())) {
+      newErrors.defaultPassword = 'Default Password is required';
+    }
 
     const roleIdNum = Number(form.roleId);
+    if (roleIdNum === 3 && form.approverAccessType === 'SINGLE_BRANCH' && !form.branchId) {
+      newErrors.branchId = 'Assigned Branch selection is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setFieldErrors(newErrors);
+      setError('Please fix all field errors marked in red.');
+      return;
+    }
+
     const payload = {
       ...form,
+      name: form.name.trim(),
+      email: form.email.trim(),
+      mobile: cleanMobile,
       roleId: roleIdNum,
       branchId: (roleIdNum === 3 && form.approverAccessType === 'SINGLE_BRANCH' && form.branchId) ? Number(form.branchId) : null,
       department: (roleIdNum === 3 || roleIdNum === 5) ? form.department : 'ALL',
@@ -152,13 +212,16 @@ const Users = () => {
     }
   };
 
-  // Check existing roles for single-account limits
-  const existingRequester = users.find(u => u.role?.name === 'BRANCH_REQUESTER' || u.roleId === 2);
-  const existingAgency = users.find(u => u.role?.name === 'AGENCY' || u.roleId === 4);
+  const existingRequester = users.find(u => (u.role?.name === 'BRANCH_REQUESTER' || u.roleId === 2) && u.id !== selectedUser?.id);
+  const existingAgency = users.find(u => (u.role?.name === 'AGENCY' || u.roleId === 4) && u.id !== selectedUser?.id);
+  const existingApproverForDept = users.find(u => (u.role?.name === 'APPROVER' || u.roleId === 3) && u.department === form.department && u.id !== selectedUser?.id);
+  const existingMonitorForDept = users.find(u => (u.role?.name === 'MONITOR' || u.roleId === 5) && u.department === form.department && u.id !== selectedUser?.id);
 
   const selectedRoleId = Number(form.roleId);
-  const isRequesterBlocked = !selectedUser && selectedRoleId === 2 && Boolean(existingRequester);
-  const isAgencyBlocked = !selectedUser && selectedRoleId === 4 && Boolean(existingAgency);
+  const isRequesterBlocked = selectedRoleId === 2 && Boolean(existingRequester);
+  const isAgencyBlocked = selectedRoleId === 4 && Boolean(existingAgency);
+  const isApproverBlocked = selectedRoleId === 3 && Boolean(existingApproverForDept);
+  const isMonitorBlocked = selectedRoleId === 5 && Boolean(existingMonitorForDept);
 
   return (
     <Box>
@@ -195,8 +258,6 @@ const Users = () => {
                 <TableCell>Contact Details</TableCell>
                 <TableCell>Role</TableCell>
                 <TableCell>Department</TableCell>
-                <TableCell>Branch</TableCell>
-                <TableCell>Approver Scope</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell align="right" sx={{ minWidth: 130 }}>Actions</TableCell>
               </TableRow>
@@ -217,8 +278,6 @@ const Users = () => {
                       'Global / All'
                     )}
                   </TableCell>
-                  <TableCell>{row.branch ? row.branch.name : 'Global / All'}</TableCell>
-                  <TableCell>{row.role?.name === 'APPROVER' ? row.approverAccessType : 'N/A'}</TableCell>
                   <TableCell><StatusChip status={row.status} /></TableCell>
                   <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                     <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
@@ -283,64 +342,84 @@ const Users = () => {
               </Alert>
             )}
 
-            <TextField label="Full Name" required fullWidth value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <TextField label="Email Address / User ID" type="email" required fullWidth value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-            <TextField label="Mobile Number" required fullWidth value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} />
+            {selectedRoleId === 3 && (
+              <Alert severity={isApproverBlocked ? "warning" : "info"}>
+                {isApproverBlocked 
+                  ? `⚠️ An Approver account already exists for the "${form.department}" department. Only 1 Approver per department is allowed.`
+                  : `ℹ️ Department Approver: 1 Approver allowed per department (${departmentsList.join(', ')}).`}
+              </Alert>
+            )}
+
+            {selectedRoleId === 5 && (
+              <Alert severity={isMonitorBlocked ? "warning" : "info"}>
+                {isMonitorBlocked 
+                  ? `⚠️ A Monitor account already exists for the "${form.department}" department. Only 1 Monitor per department is allowed.`
+                  : `ℹ️ Department Monitor: 1 Monitor allowed per department (${departmentsList.join(', ')}).`}
+              </Alert>
+            )}
+
+            <TextField
+              label="Full Name"
+              required
+              fullWidth
+              value={form.name}
+              onChange={(e) => handleInputChange('name', e.target.value)}
+              error={Boolean(fieldErrors.name)}
+              helperText={fieldErrors.name}
+            />
+            <TextField
+              label="Email Address / User ID"
+              type="email"
+              required
+              fullWidth
+              value={form.email}
+              onChange={(e) => handleInputChange('email', e.target.value)}
+              error={Boolean(fieldErrors.email)}
+              helperText={fieldErrors.email}
+            />
+            <TextField
+              label="Mobile Number"
+              required
+              fullWidth
+              value={form.mobile}
+              onChange={(e) => handleInputChange('mobile', e.target.value)}
+              error={Boolean(fieldErrors.mobile)}
+              helperText={fieldErrors.mobile}
+              placeholder="e.g. 9876543210"
+              inputProps={{ maxLength: 10, inputMode: 'numeric', pattern: '[0-9]*' }}
+            />
             
             {!selectedUser && (
-              <TextField label="Default Password" required fullWidth value={form.defaultPassword} onChange={(e) => setForm({ ...form, defaultPassword: e.target.value })} />
+              <TextField
+                label="Default Password"
+                required
+                fullWidth
+                value={form.defaultPassword}
+                onChange={(e) => handleInputChange('defaultPassword', e.target.value)}
+                error={Boolean(fieldErrors.defaultPassword)}
+                helperText={fieldErrors.defaultPassword}
+              />
             )}
 
             <FormControl fullWidth required>
               <InputLabel>Role / Position</InputLabel>
-              <Select value={form.roleId} label="Role / Position" onChange={(e) => setForm({ ...form, roleId: e.target.value })}>
+              <Select value={form.roleId} label="Role / Position" onChange={(e) => handleInputChange('roleId', e.target.value)}>
                 {roles.map((r) => (
                   <MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>
                 ))}
               </Select>
             </FormControl>
 
-            {/* Department Selection for APPROVER and MONITOR */}
             {(selectedRoleId === 3 || selectedRoleId === 5) && (
               <FormControl fullWidth required>
                 <InputLabel>Department</InputLabel>
                 <Select
                   value={form.department}
                   label="Department"
-                  onChange={(e) => setForm({ ...form, department: e.target.value })}
+                  onChange={(e) => handleInputChange('department', e.target.value)}
                 >
                   {departmentsList.map((d) => (
                     <MenuItem key={d} value={d}>{d}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
-
-            {/* Approver Access Type Selection */}
-            {selectedRoleId === 3 && (
-              <FormControl fullWidth required>
-                <InputLabel>Approver Access Scope</InputLabel>
-                <Select value={form.approverAccessType} label="Approver Access Scope" onChange={(e) => setForm({ ...form, approverAccessType: e.target.value })}>
-                  <MenuItem value="ALL_BRANCHES">All Branches (Global Approver)</MenuItem>
-                  <MenuItem value="SINGLE_BRANCH">Single Branch Only</MenuItem>
-                </Select>
-              </FormControl>
-            )}
-
-            {/* Branch Dropdown - Only for Single Branch Approver */}
-            {selectedRoleId === 3 && form.approverAccessType === 'SINGLE_BRANCH' && (
-              <FormControl fullWidth required>
-                <InputLabel>Assigned Branch</InputLabel>
-                <Select
-                  value={form.branchId}
-                  label="Assigned Branch"
-                  onChange={(e) => setForm({ ...form, branchId: e.target.value })}
-                >
-                  <MenuItem value="">-- Select Branch --</MenuItem>
-                  {branches.map((b) => (
-                    <MenuItem key={b.id} value={b.id}>
-                      {b.name} ({b.code})
-                    </MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -352,7 +431,7 @@ const Users = () => {
               type="submit" 
               variant="contained" 
               color="primary"
-              disabled={isRequesterBlocked || isAgencyBlocked}
+              disabled={isRequesterBlocked || isAgencyBlocked || isApproverBlocked || isMonitorBlocked}
             >
               Save User
             </Button>

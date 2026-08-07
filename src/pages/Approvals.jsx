@@ -11,7 +11,7 @@ import { chatService } from '../services/chatService';
 import { useAuth } from '../contexts/AuthContext';
 import StatusChip from '../components/common/StatusChip';
 import RequestChatModal from '../components/common/RequestChatModal';
-import { formatDate } from '../utils/formatters';
+import { formatDate, formatLocationDisplay } from '../utils/formatters';
 
 const Approvals = () => {
   const { user } = useAuth();
@@ -154,7 +154,7 @@ const Approvals = () => {
                   <TableCell><Chip label={row.department || 'GENERAL'} size="small" color="success" sx={{ fontWeight: 700 }} /></TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>{row.branch?.name}</Typography>
-                    <Typography variant="caption" color="text.secondary">{row.location || '-'}</Typography>
+                    <Typography variant="caption" color="text.secondary">{formatLocationDisplay(row.branch?.name, row.location)}</Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>{row.applicantName || row.requester?.name}</Typography>
@@ -162,38 +162,44 @@ const Approvals = () => {
                   </TableCell>
                   <TableCell>{row.items?.length || 0} Items</TableCell>
                   <TableCell>{formatDate(row.submittedAt)}</TableCell>
-                  <TableCell align="right">
-                    <Button
-                      variant="contained"
-                      size="small"
-                      startIcon={<CheckCircleIcon />}
-                      onClick={() => handleOpenApprovalModal(row)}
-                      sx={{ backgroundColor: '#2B6CB0', mr: 1 }}
-                    >
-                      Approve
-                    </Button>
-                    {(() => {
-                      const unreadCount = chatService.getUnreadCount(user?.id, row.id, row.chatCount);
-                      return (
-                        <Button
-                          variant={unreadCount > 0 ? "contained" : "outlined"}
-                          size="small"
-                          color={unreadCount > 0 ? "primary" : "inherit"}
-                          startIcon={
-                            unreadCount > 0 ? (
-                              <Badge badgeContent={unreadCount} color="error" max={99}>
-                                <ChatIcon />
-                              </Badge>
-                            ) : (
-                              <ChatIcon />
-                            )
-                          }
-                          onClick={() => handleOpenChat(row)}
-                        >
-                          Chat {unreadCount > 0 && `(${unreadCount})`}
-                        </Button>
-                      );
-                    })()}
+                  <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                    <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        startIcon={<CheckCircleIcon />}
+                        onClick={() => handleOpenApprovalModal(row)}
+                        sx={{ backgroundColor: '#2B6CB0' }}
+                      >
+                        Approve
+                      </Button>
+                      {(() => {
+                        const unreadCount = chatService.getUnreadCount(user?.id, row.id, row.chatCount);
+                        return unreadCount > 0 ? (
+                          <Badge badgeContent={unreadCount} color="error" max={99}>
+                            <Button
+                              variant="contained"
+                              size="small"
+                              color="primary"
+                              startIcon={<ChatIcon />}
+                              onClick={() => handleOpenChat(row)}
+                            >
+                              Chat ({unreadCount})
+                            </Button>
+                          </Badge>
+                        ) : (
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            color="inherit"
+                            startIcon={<ChatIcon />}
+                            onClick={() => handleOpenChat(row)}
+                          >
+                            Chat
+                          </Button>
+                        );
+                      })()}
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}

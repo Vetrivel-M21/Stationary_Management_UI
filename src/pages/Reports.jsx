@@ -3,7 +3,7 @@ import {
   Box, Typography, Paper, Grid, Card, CardContent, Table, TableHead, TableRow,
   TableCell, TableBody, Button, FormControl, InputLabel, Select, MenuItem,
   TextField, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions,
-  Divider, ToggleButton, ToggleButtonGroup
+  Divider, ToggleButton, ToggleButtonGroup, Chip
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import PrintIcon from '@mui/icons-material/Print';
@@ -172,8 +172,8 @@ const Reports = () => {
     });
   });
 
-  const qtyFulfillmentRate = totalApprovedQty > 0 
-    ? Math.round((totalDeliveredQty / totalApprovedQty) * 100) 
+  const qtyFulfillmentRate = totalApprovedQty > 0
+    ? Math.round((totalDeliveredQty / totalApprovedQty) * 100)
     : 0;
 
   const itemFulfillmentRate = totalApprovedItems > 0
@@ -360,8 +360,8 @@ const Reports = () => {
                 {viewPerspective === 'QUANTITY' ? totalApprovedQty : totalApprovedItems}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                {viewPerspective === 'QUANTITY' 
-                  ? `${totalRequestedQty - totalApprovedQty} units rejected` 
+                {viewPerspective === 'QUANTITY'
+                  ? `${totalRequestedQty - totalApprovedQty} units rejected`
                   : `${totalRequestedItems - totalApprovedItems} product line items rejected`}
               </Typography>
             </CardContent>
@@ -496,20 +496,22 @@ const Reports = () => {
         ) : (
           <Table>
             <TableHead>
-              <TableRow>
-                <TableCell>Request No</TableCell>
-                <TableCell>Branch</TableCell>
-                <TableCell>Requester</TableCell>
-                <TableCell>Submission Date</TableCell>
-                <TableCell>Total Items</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell align="right">Action</TableCell>
+              <TableRow sx={{ backgroundColor: '#EBF8FF' }}>
+                <TableCell sx={{ fontWeight: 700 }}>Request No</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Department</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Branch</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Requester</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Submission Date</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Total Items</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700 }}>Action</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredRequests.map((req) => (
                 <TableRow key={req.id} hover>
                   <TableCell sx={{ fontWeight: 700, color: '#2B6CB0' }}>{req.requestNo}</TableCell>
+                  <TableCell><Chip label={req.department || 'GENERAL'} size="small" color="primary" sx={{ fontWeight: 700 }} /></TableCell>
                   <TableCell>{req.branch?.name}</TableCell>
                   <TableCell>{req.requester?.name}</TableCell>
                   <TableCell>{formatDate(req.submittedAt)}</TableCell>
@@ -572,6 +574,7 @@ const Reports = () => {
                     <TableCell>Requested Qty</TableCell>
                     <TableCell>Approved Qty</TableCell>
                     <TableCell>Delivered Qty</TableCell>
+                    <TableCell sx={{ color: '#C53030' }}>Damaged Qty</TableCell>
                     <TableCell align="right">Approved Total (₹)</TableCell>
                     <TableCell>Remarks</TableCell>
                   </TableRow>
@@ -584,11 +587,13 @@ const Reports = () => {
                     const unitPrice = getItemUnitPrice(item, selectedReq.deliveries);
 
                     let deliveredQty = 0;
+                    let damagedQty = 0;
                     if (!isRejected && selectedReq.deliveries && selectedReq.deliveries.length > 0) {
                       selectedReq.deliveries.forEach((d) => {
                         (d.items || []).forEach((di) => {
                           if (Number(di.productId || di.product?.id) === Number(item.productId || item.product?.id)) {
                             deliveredQty += Number(di.deliveredQty || 0);
+                            damagedQty += Number(di.verificationItem?.damagedQty || 0);
                           }
                         });
                       });
@@ -612,6 +617,9 @@ const Reports = () => {
                         </TableCell>
                         <TableCell sx={{ color: isRejected ? 'text.disabled' : '#2F855A', fontWeight: 600 }}>
                           {isRejected ? 0 : deliveredQty}
+                        </TableCell>
+                        <TableCell sx={{ fontWeight: 600, color: damagedQty > 0 ? '#C53030' : 'text.secondary' }}>
+                          {isRejected ? '-' : (damagedQty > 0 ? damagedQty : '-')}
                         </TableCell>
                         <TableCell align="right" sx={{ fontWeight: 700, color: '#2B6CB0' }}>
                           ₹{lineApprovedTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
