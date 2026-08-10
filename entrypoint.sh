@@ -1,5 +1,11 @@
 #!/bin/sh
 
+# Ensure PORT is set for Nginx (Railway provides PORT env variable, fallback to 80)
+if [ -z "$PORT" ]; then
+  export PORT="80"
+fi
+echo "[ENTRYPOINT] Nginx listening on PORT: ${PORT}"
+
 # Fallback to VITE_API_TARGET if BACKEND_URL is empty
 if [ -z "$BACKEND_URL" ] && [ -n "$VITE_API_TARGET" ]; then
   export BACKEND_URL="$VITE_API_TARGET"
