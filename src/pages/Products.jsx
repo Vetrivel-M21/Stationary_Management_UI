@@ -18,6 +18,8 @@ const Products = () => {
   const { user } = useAuth();
   const role = typeof user?.role === 'object' ? user?.role?.name : (user?.role || '');
   const isAdmin = role === 'ADMIN';
+  const isAgency = role === 'AGENCY';
+  const canManage = isAdmin || isAgency;
 
   const [products, setProducts] = useState([]);
   const [total, setTotal] = useState(0);
@@ -29,7 +31,7 @@ const Products = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
 
-  const [form, setForm] = useState({ name: '', category: 'Writing Instruments', unit: 'Box', description: '', status: 'ACTIVE' });
+  const [form, setForm] = useState({ name: '', category: 'Writing Instruments', unit: 'Box', unitPrice: '', description: '', status: 'ACTIVE' });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -56,10 +58,10 @@ const Products = () => {
     setError('');
     if (prod) {
       setEditProduct(prod);
-      setForm({ name: prod.name, category: prod.category, unit: prod.unit, description: prod.description || '', status: prod.status });
+      setForm({ name: prod.name, category: prod.category, unit: prod.unit, unitPrice: prod.unitPrice ?? '', description: prod.description || '', status: prod.status });
     } else {
       setEditProduct(null);
-      setForm({ name: '', category: 'Writing Instruments', unit: 'Box', description: '', status: 'ACTIVE' });
+      setForm({ name: '', category: 'Writing Instruments', unit: 'Box', unitPrice: '', description: '', status: 'ACTIVE' });
     }
     setModalOpen(true);
   };
@@ -68,11 +70,12 @@ const Products = () => {
     e.preventDefault();
     setError('');
     try {
+      const payload = { ...form, unitPrice: parseFloat(form.unitPrice) || 0 };
       if (editProduct) {
-        await productService.updateProduct(editProduct.id, form);
+        await productService.updateProduct(editProduct.id, payload);
         setSuccess('Product updated successfully');
       } else {
-        await productService.createProduct(form);
+        await productService.createProduct(payload);
         setSuccess('Product created successfully');
       }
       setModalOpen(false);
@@ -99,7 +102,7 @@ const Products = () => {
         <Typography variant="h4" sx={{ fontWeight: 700 }}>
           Product Catalog
         </Typography>
-        {isAdmin && (
+        {canManage && (
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenModal()} sx={{ backgroundColor: '#2B6CB0' }}>
             Add New Product
           </Button>
@@ -142,6 +145,7 @@ const Products = () => {
                 <TableCell>Product Name</TableCell>
                 <TableCell>Category</TableCell>
                 <TableCell>Unit</TableCell>
+                <TableCell>Unit Price (₹)</TableCell>
                 <TableCell>Description</TableCell>
                 <TableCell>Status</TableCell>
                 {isAdmin && <TableCell align="right">Actions</TableCell>}
@@ -154,6 +158,7 @@ const Products = () => {
                   <TableCell sx={{ fontWeight: 600 }}>{row.name}</TableCell>
                   <TableCell>{row.category}</TableCell>
                   <TableCell>{row.unit}</TableCell>
+                  <TableCell>{row.unitPrice ? `₹${row.unitPrice}` : '-'}</TableCell>
                   <TableCell>{row.description || '-'}</TableCell>
                   <TableCell><StatusChip status={row.status} /></TableCell>
                   {isAdmin && (
@@ -218,6 +223,13 @@ const Products = () => {
               fullWidth
               value={form.unit}
               onChange={(e) => setForm({ ...form, unit: e.target.value })}
+            />
+            <TextField
+              label="Unit Price (₹)"
+              type="number"
+              fullWidth
+              value={form.unitPrice}
+              onChange={(e) => setForm({ ...form, unitPrice: e.target.value })}
             />
             <TextField
               label="Description"

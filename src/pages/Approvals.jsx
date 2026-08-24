@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box, Typography, Paper, Table, TableHead, TableRow, TableCell, TableBody,
-  Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Alert, CircularProgress, Checkbox, FormControlLabel, Chip, Badge
+  Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Alert, CircularProgress, Checkbox, FormControlLabel, Chip, Badge, Divider
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import ChatIcon from '@mui/icons-material/Chat';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import { requestService } from '../services/requestService';
 import { chatService } from '../services/chatService';
 import { useAuth } from '../contexts/AuthContext';
 import StatusChip from '../components/common/StatusChip';
+import TimelineView from '../components/common/TimelineView';
+import BillViewerModal from '../components/common/BillViewerModal';
 import RequestChatModal from '../components/common/RequestChatModal';
 import { formatDate, formatLocationDisplay } from '../utils/formatters';
 
@@ -22,6 +26,8 @@ const Approvals = () => {
   const [selectedReq, setSelectedReq] = useState(null);
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
   const [chatModalOpen, setChatModalOpen] = useState(false);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [billModalOpen, setBillModalOpen] = useState(false);
   const [itemEdits, setItemEdits] = useState({});
   const [generalRemarks, setGeneralRemarks] = useState('');
   const [error, setError] = useState('');
@@ -63,6 +69,18 @@ const Approvals = () => {
   const handleOpenChat = (req) => {
     setSelectedReq(req);
     setChatModalOpen(true);
+  };
+
+  const handleOpenDetails = async (id) => {
+    try {
+      const res = await requestService.getRequestById(id);
+      if (res.success) {
+        setSelectedReq(res.data);
+        setDetailsModalOpen(true);
+      }
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   const handleChatRead = (requestId, readCount) => {
@@ -111,6 +129,43 @@ const Approvals = () => {
       setError(err.message || 'Approval process failed');
     }
   };
+
+  const latestDelivery = selectedReq?.deliveries && selectedReq.deliveries.length > 0
+    ? selectedReq.deliveries[selectedReq.deliveries.length - 1]
+    : null;
+
+  let totalRequestedOrderValue = 0;
+  let totalApprovedOrderValue = 0;
+  let totalDeliveredOrderValue = 0;
+
+  if (selectedReq?.items) {
+    selectedReq.items.forEach((item) => {
+      let agencyUnitPrice = 0;
+      let itemDeliveredQty = 0;
+      if (selectedReq.deliveries && selectedReq.deliveries.length > 0) {
+        selectedReq.deliveries.forEach((d) => {
+          (d.items || []).forEach((di) => {
+            if (Number(di.productId || di.product?.id) === Number(item.productId || item.product?.id)) {
+              itemDeliveredQty += Number(di.deliveredQty || 0);
+              if (di.unitPrice && di.unitPrice > 0) {
+                agencyUnitPrice = di.unitPrice;
+              }
+            }
+          });
+        });
+      }
+
+      const unitPrice = agencyUnitPrice || item.unitPrice || item.product?.unitPrice || 0;
+      totalRequestedOrderValue += (item.requestedQty || 0) * unitPrice;
+
+      const isSubmitted = selectedReq.status === 'SUBMITTED';
+      const approvedQty = isSubmitted ? 0 : (item.approvalItem ? item.approvalItem.approvedQty : (item.approvedQty !== undefined ? item.approvedQty : 0));
+      const isRemoved = item.approvalItem ? item.approvalItem.remove : false;
+      const effectiveApproved = (isSubmitted || isRemoved) ? 0 : approvedQty;
+      totalApprovedOrderValue += effectiveApproved * unitPrice;
+      totalDeliveredOrderValue += itemDeliveredQty * unitPrice;
+    });
+  }
 
   return (
     <Box>
@@ -164,6 +219,14 @@ const Approvals = () => {
                   <TableCell>{formatDate(row.submittedAt)}</TableCell>
                   <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                     <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<VisibilityIcon />}
+                        onClick={() => handleOpenDetails(row.id)}
+                      >
+                        Details
+                      </Button>
                       <Button
                         variant="contained"
                         size="small"
@@ -293,6 +356,152 @@ const Approvals = () => {
           </Box>
         </DialogActions>
       </Dialog>
+
+      {/* Request Details Dialog */}
+      <Dialog open={detailsModalOpen} onClose={() => setDetailsModalOpen(false)} maxWidth="lg" fullWidth>
+        <DialogTitle sx={{ backgroundColor: '#1A202C', color: '#FFFFFF', fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+            Request Details: {selectedReq?.requestNo}
+          </Typography>
+          {latestDelivery?.billUrl && (
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<ReceiptLongIcon />}
+              onClick={() => setBillModalOpen(true)}
+              sx={{ backgroundColor: '#2F855A', '&:hover': { backgroundColor: '#276749' } }}
+            >
+              View Delivery Bill / Slip
+            </Button>
+          )}
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          {selectedReq && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <TimelineView status={selectedReq.status} request={selectedReq} />
+
+              <Box sx={{ display: 'flex', gap: 3, mb: 1, flexWrap: 'wrap' }}>
+                <Typography variant="body2"><strong>Department:</strong> {selectedReq.department || 'GENERAL'}</Typography>
+                <Typography variant="body2"><strong>Branch:</strong> {selectedReq.branch?.name}</Typography>
+                <Typography variant="body2"><strong>Location:</strong> {formatLocationDisplay(selectedReq.branch?.name, selectedReq.location)}</Typography>
+                <Typography variant="body2"><strong>Applicant:</strong> {selectedReq.applicantName || selectedReq.requester?.name} ({selectedReq.applicantMobile || selectedReq.requester?.mobile})</Typography>
+                <Typography variant="body2"><strong>Status:</strong> <StatusChip status={selectedReq.status} /></Typography>
+              </Box>
+
+              <Divider />
+
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>Requested & Delivery Item Breakdown</Typography>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Product</TableCell>
+                    <TableCell align="right">Unit Price (₹)</TableCell>
+                    <TableCell>Requested Qty</TableCell>
+                    <TableCell>Approved Qty</TableCell>
+                    <TableCell>Delivered Qty</TableCell>
+                    <TableCell align="right">Approved Total (₹)</TableCell>
+                    <TableCell>Remarks</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {selectedReq.items?.map((item) => {
+                    const isSubmitted = selectedReq.status === 'SUBMITTED';
+                    const rawApproved = item.approvalItem ? item.approvalItem.approvedQty : (item.approvedQty !== undefined ? item.approvedQty : 0);
+                    const approvedQty = isSubmitted ? 0 : rawApproved;
+                    const isRemoved = item.approvalItem ? item.approvalItem.remove : false;
+                    const isRejected = !isSubmitted && (isRemoved || (item.approvalItem && rawApproved === 0));
+
+                    let deliveredQty = 0;
+                    let agencyUnitPrice = 0;
+                    if (!isSubmitted && !isRejected && selectedReq.deliveries && selectedReq.deliveries.length > 0) {
+                      selectedReq.deliveries.forEach((d) => {
+                        (d.items || []).forEach((di) => {
+                          const diProdId = Number(di.productId || di.product?.id);
+                          const itemProdId = Number(item.productId || item.product?.id);
+                          if (diProdId === itemProdId) {
+                            deliveredQty += Number(di.deliveredQty || 0);
+                            if (di.unitPrice && di.unitPrice > 0) {
+                              agencyUnitPrice = di.unitPrice;
+                            }
+                          }
+                        });
+                      });
+                    }
+
+                    const unitPrice = agencyUnitPrice || item.unitPrice || item.product?.unitPrice || 0;
+
+                    const effectiveApproved = (isSubmitted || isRejected) ? 0 : approvedQty;
+                    const lineApprovedTotal = effectiveApproved * unitPrice;
+
+                    let remarkText = item.approvalItem?.remarks || '-';
+                    if (isSubmitted) {
+                      remarkText = 'Awaiting Approver Review';
+                    } else if (isRejected && (!item.approvalItem?.remarks || item.approvalItem.remarks === '-')) {
+                      remarkText = 'Rejected by Approver';
+                    }
+
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell sx={{ fontWeight: 600 }}>{item.product?.name}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>₹{unitPrice.toFixed(2)}</TableCell>
+                        <TableCell>{item.requestedQty}</TableCell>
+                        <TableCell sx={{ fontWeight: 600, color: isSubmitted ? '#D69E2E' : isRejected ? '#C53030' : 'inherit', fontStyle: isSubmitted ? 'italic' : 'normal' }}>
+                          {isSubmitted ? 'Pending Approval' : isRejected ? '0 (Rejected)' : approvedQty}
+                        </TableCell>
+                        <TableCell sx={{ color: isSubmitted || isRejected ? 'text.disabled' : '#2F855A', fontWeight: 600 }}>
+                          {isSubmitted || isRejected ? 0 : deliveredQty}
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700, color: isSubmitted ? 'text.secondary' : '#2B6CB0' }}>
+                          {isSubmitted ? '-' : `₹${lineApprovedTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
+                        </TableCell>
+                        <TableCell sx={{ fontStyle: isSubmitted || isRejected ? 'italic' : 'normal', color: isSubmitted ? '#D69E2E' : isRejected ? '#C53030' : 'inherit' }}>
+                          {remarkText}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+
+              <Box sx={{ p: 2, backgroundColor: '#EDF2F7', borderRadius: 1, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Total Requested Value: <strong>₹{totalRequestedOrderValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Total Delivered Value: <strong>₹{totalDeliveredOrderValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
+                  </Typography>
+                </Box>
+                <Box sx={{ textAlign: 'right' }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>TOTAL APPROVED ORDER AMOUNT</Typography>
+                  {selectedReq.status === 'SUBMITTED' ? (
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#D69E2E', fontStyle: 'italic' }}>
+                      Pending Approval
+                    </Typography>
+                  ) : (
+                    <Typography variant="h5" sx={{ fontWeight: 800, color: '#2B6CB0' }}>
+                      ₹{totalApprovedOrderValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setDetailsModalOpen(false)} variant="contained" color="primary">Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      <BillViewerModal
+        open={billModalOpen}
+        onClose={() => setBillModalOpen(false)}
+        billUrl={latestDelivery?.billUrl}
+        billNotes={latestDelivery?.billNotes}
+        requestNo={selectedReq?.requestNo}
+        deliveryDate={latestDelivery?.deliveredDate}
+        agentName={latestDelivery?.deliveryAgent?.name}
+      />
 
       <RequestChatModal
         open={chatModalOpen}

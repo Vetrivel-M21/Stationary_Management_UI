@@ -44,6 +44,7 @@ const Users = () => {
     email: '',
     mobile: '',
     defaultPassword: 'User@123',
+    password: '',
     roleId: 2,
     branchId: '',
     department: 'GOLD LOAN',
@@ -98,6 +99,7 @@ const Users = () => {
         email: u.email,
         mobile: u.mobile,
         defaultPassword: '',
+        password: '',
         roleId: u.roleId || u.role?.id || 2,
         branchId: u.branchId || u.branch?.id || '',
         department: u.department || 'GOLD LOAN',
@@ -107,7 +109,7 @@ const Users = () => {
     } else {
       setSelectedUser(null);
       setForm({
-        name: '', email: '', mobile: '', defaultPassword: 'User@123', roleId: 2, branchId: '', department: 'GOLD LOAN', approverAccessType: 'ALL_BRANCHES', status: 'ACTIVE'
+        name: '', email: '', mobile: '', defaultPassword: 'User@123', password: '', roleId: 2, branchId: '', department: 'GOLD LOAN', approverAccessType: 'ALL_BRANCHES', status: 'ACTIVE'
       });
     }
     setModalOpen(true);
@@ -151,6 +153,10 @@ const Users = () => {
       newErrors.defaultPassword = 'Default Password is required';
     }
 
+    if (selectedUser && form.password && form.password.trim().length < 6) {
+      newErrors.password = 'Password must be at least 6 characters long';
+    }
+
     const roleIdNum = Number(form.roleId);
     if (roleIdNum === 3 && form.approverAccessType === 'SINGLE_BRANCH' && !form.branchId) {
       newErrors.branchId = 'Assigned Branch selection is required';
@@ -169,7 +175,7 @@ const Users = () => {
       mobile: cleanMobile,
       roleId: roleIdNum,
       branchId: (roleIdNum === 3 && form.approverAccessType === 'SINGLE_BRANCH' && form.branchId) ? Number(form.branchId) : null,
-      department: (roleIdNum === 3 || roleIdNum === 5) ? form.department : 'ALL',
+      department: (roleIdNum === 2 || roleIdNum === 3 || roleIdNum === 5) ? form.department : 'ALL',
     };
 
     try {
@@ -212,13 +218,13 @@ const Users = () => {
     }
   };
 
-  const existingRequester = users.find(u => (u.role?.name === 'BRANCH_REQUESTER' || u.roleId === 2) && u.id !== selectedUser?.id);
+  const existingRequesterForDept = users.find(u => (u.role?.name === 'BRANCH_REQUESTER' || u.roleId === 2) && u.department === form.department && u.id !== selectedUser?.id);
   const existingAgency = users.find(u => (u.role?.name === 'AGENCY' || u.roleId === 4) && u.id !== selectedUser?.id);
   const existingApproverForDept = users.find(u => (u.role?.name === 'APPROVER' || u.roleId === 3) && u.department === form.department && u.id !== selectedUser?.id);
   const existingMonitorForDept = users.find(u => (u.role?.name === 'MONITOR' || u.roleId === 5) && u.department === form.department && u.id !== selectedUser?.id);
 
   const selectedRoleId = Number(form.roleId);
-  const isRequesterBlocked = selectedRoleId === 2 && Boolean(existingRequester);
+  const isRequesterBlocked = selectedRoleId === 2 && Boolean(existingRequesterForDept);
   const isAgencyBlocked = selectedRoleId === 4 && Boolean(existingAgency);
   const isApproverBlocked = selectedRoleId === 3 && Boolean(existingApproverForDept);
   const isMonitorBlocked = selectedRoleId === 5 && Boolean(existingMonitorForDept);
@@ -328,9 +334,9 @@ const Users = () => {
             
             {selectedRoleId === 2 && (
               <Alert severity={isRequesterBlocked ? "warning" : "info"}>
-                {isRequesterBlocked 
-                  ? "⚠️ A shared Requester account already exists. Only 1 shared Requester account is allowed."
-                  : "ℹ️ Shared Requester Account: 1 single shared account in the system for all requesters."}
+                {isRequesterBlocked
+                  ? `⚠️ A Requester account already exists for the "${form.department}" department. Only 1 Requester per department is allowed.`
+                  : `ℹ️ Department Requester: 1 Requester allowed per department (${departmentsList.join(', ')}).`}
               </Alert>
             )}
 
@@ -401,6 +407,18 @@ const Users = () => {
               />
             )}
 
+            {selectedUser && (
+              <TextField
+                label="New Password"
+                type="password"
+                fullWidth
+                value={form.password}
+                onChange={(e) => handleInputChange('password', e.target.value)}
+                error={Boolean(fieldErrors.password)}
+                helperText={fieldErrors.password || 'Leave blank to keep the current password unchanged'}
+              />
+            )}
+
             <FormControl fullWidth required>
               <InputLabel>Role / Position</InputLabel>
               <Select value={form.roleId} label="Role / Position" onChange={(e) => handleInputChange('roleId', e.target.value)}>
@@ -410,7 +428,7 @@ const Users = () => {
               </Select>
             </FormControl>
 
-            {(selectedRoleId === 3 || selectedRoleId === 5) && (
+            {(selectedRoleId === 2 || selectedRoleId === 3 || selectedRoleId === 5) && (
               <FormControl fullWidth required>
                 <InputLabel>Department</InputLabel>
                 <Select

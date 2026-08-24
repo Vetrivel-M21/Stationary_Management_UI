@@ -24,7 +24,7 @@ const LoginLayout = ({ children }) => {
           }}
         >
           <Typography variant="h4" sx={{ color: '#1A202C', fontWeight: 700, mb: 1 }}>
-            Stationery Portal
+            Veyon Agency
           </Typography>
           <Typography variant="body2" sx={{ color: '#4A5568', mb: 3 }}>
             Enterprise Multi-Branch Stationery Management System

@@ -1,8 +1,8 @@
 import api from './api';
 
 export const authService = {
-  login: async (mobile, password) => {
-    return await api.post('/auth/login', { mobile, password });
+  login: async (identifier, password) => {
+    return await api.post('/auth/login', { identifier, password });
   },
   changePassword: async (oldPassword, newPassword) => {
     return await api.post('/auth/change-password', { oldPassword, newPassword });

@@ -178,6 +178,11 @@ const Deliveries = () => {
       return;
     }
 
+    if (!billUrl) {
+      setError('Bill / Slip attachment is required before dispatching.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const itemsPayload = Object.values(itemDeliveries).map((item) => ({
@@ -279,6 +284,11 @@ const Deliveries = () => {
               Unit price (₹) is required for all delivered items. Please specify valid unit prices to enable dispatch.
             </Alert>
           )}
+          {!billUrl && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              A Bill / Slip attachment is required before this delivery can be dispatched.
+            </Alert>
+          )}
 
           <Table size="small" sx={{ mt: 2, mb: 3 }}>
             <TableHead>
@@ -361,20 +371,25 @@ const Deliveries = () => {
           </Box>
 
           {/* Bill Attachment & Notes Upload */}
-          <Paper sx={{ p: 2, mb: 2, backgroundColor: '#F8FAFC' }}>
+          <Paper sx={{ p: 2, mb: 2, backgroundColor: '#F8FAFC', border: !billUrl ? '1px solid #E53E3E' : 'none' }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#2D3748' }}>
-              📄 Delivery Bill / Slip Attachment Upload:
+              📄 Delivery Bill / Slip Attachment Upload: *
             </Typography>
 
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
-              <Button variant="outlined" component="label" size="small">
-                Upload Bill / Slip (Image/PDF)
+              <Button variant="outlined" component="label" size="small" color={!billUrl ? 'error' : 'primary'}>
+                Upload Bill / Slip (Image/PDF) *
                 <input type="file" hidden accept="image/*,application/pdf" onChange={handleFileUpload} />
               </Button>
               {billUrl && (
                 <Button variant="text" color="error" size="small" onClick={() => setBillUrl('')}>
                   Remove Attachment
                 </Button>
+              )}
+              {!billUrl && (
+                <Typography variant="caption" color="error" sx={{ fontWeight: 600 }}>
+                  Required before dispatch
+                </Typography>
               )}
             </Box>
 
@@ -414,7 +429,7 @@ const Deliveries = () => {
           <Button
             variant="contained"
             color="primary"
-            disabled={submitting || totalDeliveredQty <= 0 || missingUnitPrice}
+            disabled={submitting || totalDeliveredQty <= 0 || missingUnitPrice || !billUrl}
             startIcon={<LocalShippingIcon />}
             onClick={handleSubmitDelivery}
             sx={{ backgroundColor: '#2B6CB0' }}

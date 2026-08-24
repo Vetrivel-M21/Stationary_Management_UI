@@ -20,7 +20,7 @@ const Header = ({ onDrawerToggle, onChangePasswordClick }) => {
           <MenuIcon />
         </IconButton>
         <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontWeight: 800, letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Box component="span" sx={{ color: '#63B3ED', fontWeight: 900 }}>ARMSS</Box> <span style={{ color: '#FFFFFF' }}>STATIONERY MANAGEMENT</span>
+          <Box component="span" sx={{ color: '#63B3ED', fontWeight: 900 }}>VEYON</Box> <span style={{ color: '#FFFFFF' }}>AGENCY</span>
         </Typography>
 
         {user && (() => {

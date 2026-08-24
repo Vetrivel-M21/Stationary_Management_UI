@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { TextField, Button, Box, Alert, CircularProgress, Typography, Tabs, Tab, Paper, Chip } from '@mui/material';
+import { TextField, Button, Box, Alert, CircularProgress, Typography, Tabs, Tab, Paper, Chip, IconButton, InputAdornment } from '@mui/material';
 import BadgeIcon from '@mui/icons-material/Badge';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import LoginLayout from '../layouts/LoginLayout';
 
 const Login = () => {
   const [tabIndex, setTabIndex] = useState(0); // 0: Staff Login, 1: Agency Login
-  const [mobile, setMobile] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const { login, loading } = useAuth();
   const navigate = useNavigate();
@@ -17,13 +20,11 @@ const Login = () => {
   const handleTabChange = (event, newValue) => {
     setTabIndex(newValue);
     setError('');
-    setMobile('');
+    setIdentifier('');
   };
 
-  const handleMobileChange = (val) => {
-    // Only allow digits up to 11 characters (10-digit number or 11-digit number starting with 0)
-    const digits = val.replace(/\D/g, '').slice(0, 10);
-    setMobile(digits);
+  const handleIdentifierChange = (val) => {
+    setIdentifier(val);
     if (error) setError('');
   };
 
@@ -31,14 +32,14 @@ const Login = () => {
     e.preventDefault();
     setError('');
 
-    const cleanMobile = mobile.trim().replace(/\D/g, '');
-    if (!cleanMobile || cleanMobile.length !== 10) {
-      setError('Please enter a valid 10-digit Mobile Number.');
+    const cleanIdentifier = identifier.trim();
+    if (!cleanIdentifier) {
+      setError('Please enter your Mobile Number or Username.');
       return;
     }
 
     try {
-      const user = await login(cleanMobile, password);
+      const user = await login(cleanIdentifier, password);
       
       // Role & Department based redirection
       if (user?.role?.name === 'AGENCY') {
@@ -58,7 +59,7 @@ const Login = () => {
   };
 
   const quickFill = (mob) => {
-    setMobile(mob);
+    setIdentifier(mob);
     setPassword('Admin@123');
   };
 
@@ -87,23 +88,35 @@ const Login = () => {
         </Typography>
 
         <TextField
-          label="Mobile Number"
+          label="Mobile Number or Username"
           variant="outlined"
           fullWidth
           required
-          value={mobile}
-          onChange={(e) => handleMobileChange(e.target.value)}
-          placeholder="e.g. 9876543210"
-          inputProps={{ maxLength: 10, inputMode: 'numeric', pattern: '[0-9]*' }}
+          value={identifier}
+          onChange={(e) => handleIdentifierChange(e.target.value)}
+          placeholder="e.g. 9876543210 or your name"
         />
         <TextField
           label="Password"
-          type="password"
+          type={showPassword ? 'text' : 'password'}
           variant="outlined"
           fullWidth
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  edge="end"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <VisibilityOff /> : <Visibility />}
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
         />
         <Button
           type="submit"

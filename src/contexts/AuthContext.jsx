@@ -21,10 +21,10 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(() => localStorage.getItem('stationery_token'));
   const [loading, setLoading] = useState(false);
 
-  const login = async (mobile, password) => {
+  const login = async (identifier, password) => {
     setLoading(true);
     try {
-      const res = await authService.login(mobile, password);
+      const res = await authService.login(identifier, password);
       if (res.success) {
         const normUser = normalizeUser(res.data.user);
         setToken(res.data.token);

@@ -15,7 +15,7 @@ const Footer = () => {
       }}
     >
       <Typography variant="body2" color="text.secondary">
-        Stationery Management System &copy; {new Date().getFullYear()} Enterprise Multi-Branch Solution. All rights reserved.
+        Veyon Agency &copy; {new Date().getFullYear()} Enterprise Multi-Branch Solution. All rights reserved.
       </Typography>
     </Box>
   );

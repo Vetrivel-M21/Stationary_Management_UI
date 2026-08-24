@@ -22,6 +22,7 @@ const NewRequest = () => {
   const navigate = useNavigate();
   const role = typeof user?.role === 'object' ? user?.role?.name : (user?.role || '');
   const isAdmin = role === 'ADMIN';
+  const isRequester = role === 'BRANCH_REQUESTER';
 
   const [products, setProducts] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -43,6 +44,12 @@ const NewRequest = () => {
   useEffect(() => {
     fetchInitialData();
   }, []);
+
+  useEffect(() => {
+    if (isRequester && user?.department) {
+      setDepartment(user.department);
+    }
+  }, [isRequester, user]);
 
   const fetchInitialData = async () => {
     setLoading(true);
@@ -253,15 +260,18 @@ const NewRequest = () => {
               <Select
                 value={department}
                 label="Department"
+                disabled={isRequester}
                 onChange={(e) => handleFieldChange('department', e.target.value, setDepartment)}
               >
                 <MenuItem value="GOLD LOAN">GOLD LOAN</MenuItem>
                 <MenuItem value="CHIT FUND">CHIT FUND</MenuItem>
                 <MenuItem value="OTHERS">OTHERS</MenuItem>
               </Select>
-              {fieldErrors.department && (
+              {fieldErrors.department ? (
                 <FormHelperText>{fieldErrors.department}</FormHelperText>
-              )}
+              ) : isRequester ? (
+                <FormHelperText>Locked to your assigned department</FormHelperText>
+              ) : null}
             </FormControl>
           </Grid>
 
