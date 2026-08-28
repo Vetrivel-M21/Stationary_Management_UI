@@ -23,6 +23,12 @@ const LoginLayout = ({ children }) => {
             textAlign: 'center',
           }}
         >
+          <Box
+            component="img"
+            src="/logo.png"
+            alt="Logo"
+            sx={{ height: 72, width: 72, mb: 1 }}
+          />
           <Typography variant="h4" sx={{ color: '#1A202C', fontWeight: 700, mb: 1 }}>
             Veyon Agency
           </Typography>

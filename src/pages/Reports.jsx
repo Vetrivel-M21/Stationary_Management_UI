@@ -44,6 +44,7 @@ const Reports = () => {
   const [selectedReq, setSelectedReq] = useState(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [billModalOpen, setBillModalOpen] = useState(false);
+  const [paymentProofModalOpen, setPaymentProofModalOpen] = useState(false);
 
   useEffect(() => {
     fetchInitialData();
@@ -185,11 +186,12 @@ const Reports = () => {
   // Export to CSV with Financial Amounts & Bill Link
   const handleExportCSV = () => {
     const csvRows = [
-      ['Request No', 'Submitted Date', 'Branch', 'Requester', 'Status', 'Product Name', 'Unit Price (INR)', 'Requested Qty', 'Approved Qty', 'Delivered Qty', 'Approved Amount (INR)', 'Delivered Amount (INR)', 'Remarks', 'Bill Attached']
+      ['Request No', 'Submitted Date', 'Branch', 'Requester', 'Status', 'Product Name', 'Unit Price (INR)', 'Requested Qty', 'Approved Qty', 'Delivered Qty', 'Approved Amount (INR)', 'Delivered Amount (INR)', 'Remarks', 'Bill Attached', 'Payment Proof Attached']
     ];
 
     filteredRequests.forEach((req) => {
       const hasBill = req.deliveries?.some(d => d.billUrl);
+      const hasPaymentProof = Boolean(req.paymentProofUrl);
 
       (req.items || []).forEach((item) => {
         const unitPrice = getItemUnitPrice(item, req.deliveries);
@@ -233,7 +235,8 @@ const Reports = () => {
           lineApprovedAmount.toFixed(2),
           lineDeliveredAmount.toFixed(2),
           `"${remarks}"`,
-          hasBill ? 'YES' : 'NO'
+          hasBill ? 'YES' : 'NO',
+          hasPaymentProof ? 'YES' : 'NO'
         ]);
       });
     });
@@ -540,17 +543,30 @@ const Reports = () => {
           <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
             Order Audit Report: {selectedReq?.requestNo} ({selectedReq?.branch?.name})
           </Typography>
-          {selectedReq?.deliveries?.some(d => d.billUrl) && (
-            <Button
-              variant="contained"
-              size="small"
-              startIcon={<ReceiptLongIcon />}
-              onClick={() => setBillModalOpen(true)}
-              sx={{ backgroundColor: '#2F855A', '&:hover': { backgroundColor: '#276749' } }}
-            >
-              View Delivery Bill / Slip
-            </Button>
-          )}
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            {selectedReq?.deliveries?.some(d => d.billUrl) && (
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<ReceiptLongIcon />}
+                onClick={() => setBillModalOpen(true)}
+                sx={{ backgroundColor: '#2F855A', '&:hover': { backgroundColor: '#276749' } }}
+              >
+                View Delivery Bill / Slip
+              </Button>
+            )}
+            {selectedReq?.paymentProofUrl && (
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<AttachMoneyIcon />}
+                onClick={() => setPaymentProofModalOpen(true)}
+                sx={{ backgroundColor: '#2B6CB0', '&:hover': { backgroundColor: '#2C5282' } }}
+              >
+                View Payment Proof
+              </Button>
+            )}
+          </Box>
         </DialogTitle>
         <DialogContent sx={{ pt: 3 }}>
           {selectedReq && (
@@ -649,6 +665,17 @@ const Reports = () => {
         requestNo={selectedReq?.requestNo}
         deliveryDate={selectedReq?.deliveries?.find(d => d.billUrl)?.deliveredDate}
         agentName={selectedReq?.deliveries?.find(d => d.billUrl)?.deliveryAgent?.name}
+      />
+
+      {/* Payment Proof Viewer */}
+      <BillViewerModal
+        open={paymentProofModalOpen}
+        onClose={() => setPaymentProofModalOpen(false)}
+        billUrl={selectedReq?.paymentProofUrl}
+        requestNo={selectedReq?.requestNo}
+        title="Payment Proof Attachment"
+        downloadFileNamePrefix="Payment_Proof"
+        emptyMessage="No payment proof attachment uploaded for this request."
       />
     </Box>
   );

@@ -8,14 +8,14 @@ import DownloadIcon from '@mui/icons-material/Download';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import { formatDateTime } from '../../utils/formatters';
 
-const BillViewerModal = ({ open, onClose, billUrl, billNotes, requestNo, deliveryDate, agentName }) => {
+const BillViewerModal = ({ open, onClose, billUrl, billNotes, requestNo, deliveryDate, agentName, title = 'Delivery Bill & Receipt Slip', downloadFileNamePrefix = 'Delivery_Bill', emptyMessage = 'No bill attachment image uploaded for this delivery.' }) => {
   if (!open) return null;
 
   const handleDownload = () => {
     if (!billUrl) return;
     const link = document.createElement('a');
     link.href = billUrl;
-    link.download = `Delivery_Bill_${requestNo || 'Receipt'}.png`;
+    link.download = `${downloadFileNamePrefix}_${requestNo || 'Receipt'}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -29,7 +29,7 @@ const BillViewerModal = ({ open, onClose, billUrl, billNotes, requestNo, deliver
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <ReceiptLongIcon />
           <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
-            Delivery Bill & Receipt Slip ({requestNo || 'Order'})
+            {title} ({requestNo || 'Order'})
           </Typography>
         </Box>
         <IconButton onClick={onClose} size="small" sx={{ color: '#FFFFFF' }}>
@@ -92,7 +92,7 @@ const BillViewerModal = ({ open, onClose, billUrl, billNotes, requestNo, deliver
           </Box>
         ) : (
           <Box sx={{ py: 6, textAlign: 'center' }}>
-            <Typography color="text.secondary">No bill attachment image uploaded for this delivery.</Typography>
+            <Typography color="text.secondary">{emptyMessage}</Typography>
           </Box>
         )}
       </DialogContent>

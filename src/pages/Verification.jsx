@@ -19,6 +19,7 @@ const Verification = () => {
   const [verifyModalOpen, setVerifyModalOpen] = useState(false);
   const [verificationData, setVerificationData] = useState({});
   const [notes, setNotes] = useState('');
+  const [paymentProofUrl, setPaymentProofUrl] = useState('');
   const [error, setError] = useState('');
   const [billPreviewUrl, setBillPreviewUrl] = useState(null);
 
@@ -103,8 +104,25 @@ const Verification = () => {
 
     setVerificationData(initialVerif);
     setNotes('');
+    setPaymentProofUrl('');
     setError('');
     setVerifyModalOpen(true);
+  };
+
+  const handlePaymentProofUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Payment proof file size must be less than 5MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setPaymentProofUrl(reader.result);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleFieldChange = (itemId, field, valStr) => {
@@ -163,6 +181,12 @@ const Verification = () => {
 
   const handleSubmitVerification = async () => {
     setError('');
+
+    if (!paymentProofUrl) {
+      setError('Payment proof attachment is required to complete verification.');
+      return;
+    }
+
     try {
       const itemsPayload = Object.values(verificationData).map((item) => ({
         ...item,
@@ -172,6 +196,7 @@ const Verification = () => {
       }));
       const payload = {
         verificationNotes: notes,
+        paymentProofUrl,
         items: itemsPayload,
       };
 
@@ -389,6 +414,50 @@ const Verification = () => {
             </Typography>
           </Box>
 
+          {/* Payment Proof Attachment Upload */}
+          <Paper sx={{ p: 2, mb: 2, backgroundColor: '#F8FAFC', border: !paymentProofUrl ? '1px solid #E53E3E' : 'none' }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#2D3748' }}>
+              📄 Payment Proof Upload (Image/PDF): *
+            </Typography>
+
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
+              <Button variant="outlined" component="label" size="small" color={!paymentProofUrl ? 'error' : 'primary'}>
+                Upload Payment Proof (Image/PDF) *
+                <input type="file" hidden accept="image/*,application/pdf" onChange={handlePaymentProofUpload} />
+              </Button>
+              {paymentProofUrl && (
+                <Button variant="text" color="error" size="small" onClick={() => setPaymentProofUrl('')}>
+                  Remove Attachment
+                </Button>
+              )}
+              {!paymentProofUrl && (
+                <Typography variant="caption" color="error" sx={{ fontWeight: 600 }}>
+                  Required before finalizing verification
+                </Typography>
+              )}
+            </Box>
+
+            {paymentProofUrl && (
+              <Box sx={{ mb: 1, p: 1.5, border: '1px dashed #3182CE', borderRadius: 1, backgroundColor: '#FFFFFF' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 700 }}>
+                  Payment Proof Preview:
+                </Typography>
+                {paymentProofUrl.startsWith('data:application/pdf') ? (
+                  <Typography variant="body2" sx={{ color: '#2F855A', fontWeight: 600 }}>
+                    PDF Document Loaded Ready for Attachment
+                  </Typography>
+                ) : (
+                  <Box
+                    component="img"
+                    src={paymentProofUrl}
+                    alt="Payment Proof Preview"
+                    sx={{ maxHeight: 120, borderRadius: 1, border: '1px solid #CBD5E0' }}
+                  />
+                )}
+              </Box>
+            )}
+          </Paper>
+
           <TextField
             label="Verification Remarks / Condition Notes"
             multiline
@@ -406,6 +475,7 @@ const Verification = () => {
             color="primary"
             startIcon={<VerifiedIcon />}
             onClick={handleSubmitVerification}
+            disabled={!paymentProofUrl}
             sx={{ backgroundColor: '#2F855A' }}
           >
             Finalize Verification

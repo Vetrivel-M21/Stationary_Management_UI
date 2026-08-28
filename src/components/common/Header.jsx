@@ -20,6 +20,7 @@ const Header = ({ onDrawerToggle, onChangePasswordClick }) => {
           <MenuIcon />
         </IconButton>
         <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontWeight: 800, letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box component="img" src="/android-chrome-192x192.png" alt="Logo" sx={{ height: 44, width: 44, mr: 0.5 }} />
           <Box component="span" sx={{ color: '#63B3ED', fontWeight: 900 }}>VEYON</Box> <span style={{ color: '#FFFFFF' }}>AGENCY</span>
         </Typography>
 
@@ -28,13 +29,13 @@ const Header = ({ onDrawerToggle, onChangePasswordClick }) => {
           return (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Chip
-                label={`${roleName} ${user.branch ? `- ${user.branch.name}` : ''}`}
+                label={`${user.name} ${user.department ? `- ${user.department}` : ''}`}
                 sx={{ backgroundColor: '#2B6CB0', color: '#FFFFFF', fontWeight: 600 }}
                 size="medium"
               />
-              <Typography variant="body1" sx={{ color: '#E2E8F0', fontWeight: 500 }}>
+              {/* <Typography variant="body1" sx={{ color: '#E2E8F0', fontWeight: 500 }}>
                 {user.name}
-              </Typography>
+              </Typography> */}
               <IconButton size="large" onClick={handleMenu} color="inherit">
                 <Avatar sx={{ bgcolor: '#4A5568', width: 36, height: 36 }}>{user.name ? user.name[0] : 'U'}</Avatar>
               </IconButton>

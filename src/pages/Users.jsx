@@ -21,7 +21,7 @@ const roles = [
   { id: 5, name: 'MONITOR' },
 ];
 
-const departmentsList = ['GOLD LOAN', 'CHIT FUND', 'OTHERS'];
+const departmentsList = ['GOLD LOAN', 'CHIT FUND', 'OTHERS', 'NIDHI'];
 
 const Users = () => {
   const [users, setUsers] = useState([]);
@@ -37,7 +37,7 @@ const Users = () => {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [userToDelete, setUserToDelete] = useState(null);
-  const [resetPasswordVal, setResetPasswordVal] = useState('User@123');
+  const [resetPasswordVal, setResetPasswordVal] = useState('');
 
   const [form, setForm] = useState({
     name: '',
@@ -99,7 +99,7 @@ const Users = () => {
         email: u.email,
         mobile: u.mobile,
         defaultPassword: '',
-        password: '',
+        password: u.password,
         roleId: u.roleId || u.role?.id || 2,
         branchId: u.branchId || u.branch?.id || '',
         department: u.department || 'GOLD LOAN',
@@ -290,7 +290,7 @@ const Users = () => {
                       <IconButton size="small" color="primary" onClick={() => handleOpenModal(row)} title="Edit Profile">
                         <EditIcon fontSize="small" />
                       </IconButton>
-                      <IconButton size="small" color="warning" onClick={() => { setSelectedUser(row); setResetModalOpen(true); }} title="Reset Password">
+                      <IconButton size="small" color="warning" onClick={() => { setSelectedUser(row); setResetPasswordVal(row.password); setResetModalOpen(true); }} title="Reset Password">
                         <LockResetIcon fontSize="small" />
                       </IconButton>
                       <IconButton
@@ -410,7 +410,7 @@ const Users = () => {
             {selectedUser && (
               <TextField
                 label="New Password"
-                type="password"
+                type="text"
                 fullWidth
                 value={form.password}
                 onChange={(e) => handleInputChange('password', e.target.value)}
