@@ -6,9 +6,19 @@ import {
 } from '@mui/material';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import TableChartIcon from '@mui/icons-material/TableChart';
+import PrintIcon from '@mui/icons-material/Print';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import { requestService } from '../services/requestService';
 import StatusChip from '../components/common/StatusChip';
 import { formatDateTime } from '../utils/formatters';
+
+const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, (c) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}[c]));
 
 const Deliveries = () => {
   const [requests, setRequests] = useState([]);
@@ -287,10 +297,97 @@ const Deliveries = () => {
         ...t,
         remainingQty: Math.max(0, t.totalApprovedQty - (t.totalDeliveredQty + t.totalUnavailableQty)),
       }))
+      .filter((t) => t.remainingQty > 0)
       .sort((a, b) => b.remainingQty - a.remainingQty);
   };
 
   const overallProductTotals = overallModalOpen ? buildOverallProductTotals() : [];
+
+  const getOverallFilterLines = () => [
+    `Department: ${overallDeptFilter === 'ALL' ? 'All Departments' : overallDeptFilter}`,
+    overallFromDate ? `Approved From: ${new Date(overallFromDate).toLocaleString()}` : null,
+    overallToDate ? `Approved To: ${new Date(overallToDate).toLocaleString()}` : null,
+  ].filter(Boolean);
+
+  const handleExportOverallPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(14);
+    doc.text('Overall Product Order (Current Delivery Queue)', 14, 15);
+    doc.setFontSize(9);
+    doc.text(getOverallFilterLines().join('   |   '), 14, 22);
+
+    autoTable(doc, {
+      startY: 27,
+      head: [['Product', 'Unit', 'Total Requested Qty', 'Total Approved Qty', 'Remaining to Deliver']],
+      body: overallProductTotals.map((t) => [t.name, t.unit, t.totalRequestedQty, t.totalApprovedQty, t.remainingQty]),
+      headStyles: { fillColor: [26, 32, 44] },
+    });
+
+    doc.save(`Overall_Product_Order_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
+  const handleExportOverallExcel = () => {
+    const wsData = [
+      ['Product', 'Unit', 'Total Requested Qty', 'Total Approved Qty', 'Remaining to Deliver'],
+      ...overallProductTotals.map((t) => [t.name, t.unit, t.totalRequestedQty, t.totalApprovedQty, t.remainingQty]),
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Overall Product Order');
+    XLSX.writeFile(wb, `Overall_Product_Order_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const handlePrintOverall = () => {
+    const rows = overallProductTotals.map((t) => `
+      <tr>
+        <td>${escapeHtml(t.name)}</td>
+        <td>${escapeHtml(t.unit)}</td>
+        <td style="text-align:right">${t.totalRequestedQty}</td>
+        <td style="text-align:right">${t.totalApprovedQty}</td>
+        <td style="text-align:right">${t.remainingQty}</td>
+      </tr>
+    `).join('');
+
+    const html = `
+      <html>
+        <head>
+          <title>Overall Product Order</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; color: #1A202C; }
+            h1 { font-size: 18px; margin-bottom: 4px; }
+            p.filters { font-size: 12px; color: #4A5568; margin-top: 0; margin-bottom: 16px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #CBD5E0; padding: 6px 10px; font-size: 12px; }
+            th { background-color: #EBF8FF; text-align: left; }
+          </style>
+        </head>
+        <body>
+          <h1>Overall Product Order (Current Delivery Queue)</h1>
+          <p class="filters">${escapeHtml(getOverallFilterLines().join('  |  '))}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Unit</th>
+                <th style="text-align:right">Total Requested Qty</th>
+                <th style="text-align:right">Total Approved Qty</th>
+                <th style="text-align:right">Remaining to Deliver</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.onload = () => {
+      printWindow.print();
+    };
+  };
 
   return (
     <Box>
@@ -526,7 +623,7 @@ const Deliveries = () => {
       </Dialog>
 
       {/* Overall Product Order Dialog */}
-      <Dialog open={overallModalOpen} onClose={() => setOverallModalOpen(false)} maxWidth="md" fullWidth>
+      <Dialog open={overallModalOpen} onClose={() => setOverallModalOpen(false)} maxWidth="lg" fullWidth>
         <DialogTitle sx={{ backgroundColor: '#1A202C', color: '#FFFFFF', fontWeight: 700, px: 3, py: 2 }}>
           Overall Product Order (Current Delivery Queue)
         </DialogTitle>
@@ -574,6 +671,36 @@ const Deliveries = () => {
               }}
             >
               Clear Filters
+            </Button>
+          </Box>
+
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<PictureAsPdfIcon />}
+              disabled={overallProductTotals.length === 0}
+              onClick={handleExportOverallPDF}
+            >
+              Export PDF
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<TableChartIcon />}
+              disabled={overallProductTotals.length === 0}
+              onClick={handleExportOverallExcel}
+            >
+              Export Excel
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<PrintIcon />}
+              disabled={overallProductTotals.length === 0}
+              onClick={handlePrintOverall}
+            >
+              Print
             </Button>
           </Box>
 
