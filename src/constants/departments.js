@@ -1,0 +1,1 @@
+export const DEPARTMENTS = ['GOLD LOAN', 'CHIT FUND', 'OTHERS', 'NIDHI'];

@@ -92,7 +92,7 @@ const Reports = () => {
       const matchNo = req.requestNo?.toLowerCase().includes(term);
       const matchRequester = req.requester?.name?.toLowerCase().includes(term);
       const matchBranch = req.branch?.name?.toLowerCase().includes(term);
-      const matchItem = req.items?.some(i => i.product?.name?.toLowerCase().includes(term));
+      const matchItem = req.items?.some(i => (i.itemKind === 'SHOP' ? i.itemName : i.product?.name)?.toLowerCase().includes(term));
       if (!matchNo && !matchRequester && !matchBranch && !matchItem) return false;
     }
     if (startDate) {
@@ -227,7 +227,7 @@ const Reports = () => {
           `"${req.branch?.name || ''}"`,
           `"${req.requester?.name || ''}"`,
           `"${req.status}"`,
-          `"${item.product?.name || ''}"`,
+          `"${item.itemKind === 'SHOP' ? (item.itemName || '') : (item.product?.name || '')}"`,
           unitPrice.toFixed(2),
           item.requestedQty,
           isRejected ? 0 : approvedQty,
@@ -625,7 +625,12 @@ const Reports = () => {
 
                     return (
                       <TableRow key={item.id}>
-                        <TableCell sx={{ fontWeight: 600 }}>{item.product?.name}</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>
+                          {item.itemKind === 'SHOP' ? item.itemName : item.product?.name}
+                          {item.itemKind === 'SHOP' && (
+                            <Chip label="Shop Item" size="small" sx={{ ml: 1, backgroundColor: '#FEF3C7', color: '#92400E', fontWeight: 700, fontSize: '0.65rem' }} />
+                          )}
+                        </TableCell>
                         <TableCell align="right" sx={{ fontWeight: 600 }}>₹{unitPrice.toFixed(2)}</TableCell>
                         <TableCell>{item.requestedQty}</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: isRejected ? '#C53030' : 'inherit' }}>

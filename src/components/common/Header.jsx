@@ -46,9 +46,11 @@ const Header = ({ onDrawerToggle, onChangePasswordClick }) => {
                 transformOrigin={{ horizontal: 'right', vertical: 'top' }}
                 anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
               >
-                <MenuItem onClick={() => { handleClose(); onChangePasswordClick(); }}>
-                  <LockResetIcon sx={{ mr: 1, color: '#4A5568' }} /> Change Password
-                </MenuItem>
+                {!['BRANCH_REQUESTER', 'APPROVER', 'MONITOR'].includes(roleName) && (
+                  <MenuItem onClick={() => { handleClose(); onChangePasswordClick(); }}>
+                    <LockResetIcon sx={{ mr: 1, color: '#4A5568' }} /> Change Password
+                  </MenuItem>
+                )}
                 <MenuItem onClick={() => { handleClose(); logout(); }}>
                   <LogoutIcon sx={{ mr: 1, color: '#E53E3E' }} /> Logout
                 </MenuItem>

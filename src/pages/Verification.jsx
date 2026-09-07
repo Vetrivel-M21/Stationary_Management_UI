@@ -1,16 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box, Typography, Paper, Table, TableHead, TableRow, TableCell, TableBody,
-  Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Alert, CircularProgress, Chip
+  Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Alert, CircularProgress, Chip, IconButton
 } from '@mui/material';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import DownloadIcon from '@mui/icons-material/Download';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import StorefrontIcon from '@mui/icons-material/Storefront';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { requestService } from '../services/requestService';
 import StatusChip from '../components/common/StatusChip';
 import { formatDate } from '../utils/formatters';
+
+const getApprovedShopItems = (req) => (req.items || []).filter(
+  (i) => i.itemKind === 'SHOP' && i.approvalItem && !i.approvalItem.remove && i.approvalItem.approvedQty > 0
+);
+const isShopDeclarationPending = (req) => getApprovedShopItems(req).length > 0 && !req.shopItemsVerifiedAt;
 
 const Verification = () => {
   const [requests, setRequests] = useState([]);
@@ -23,6 +30,15 @@ const Verification = () => {
   const [error, setError] = useState('');
   const [billPreviewUrl, setBillPreviewUrl] = useState(null);
 
+  // Shop item (non-catalog) purchase declaration
+  const [shopModalOpen, setShopModalOpen] = useState(false);
+  const [selectedShopReq, setSelectedShopReq] = useState(null);
+  const [shopBillUrls, setShopBillUrls] = useState([]);
+  const [shopPaymentProofUrls, setShopPaymentProofUrls] = useState([]);
+  const [shopNotes, setShopNotes] = useState('');
+  const [shopError, setShopError] = useState('');
+  const [shopSubmitting, setShopSubmitting] = useState(false);
+
   useEffect(() => {
     fetchDeliveredRequests();
   }, []);
@@ -30,14 +46,20 @@ const Verification = () => {
   const fetchDeliveredRequests = async () => {
     setLoading(true);
     try {
-      const resDelivered = await requestService.getRequests('DELIVERED', 1, 100);
-      const resPartial = await requestService.getRequests('PARTIALLY_DELIVERED', 1, 100);
+      const statuses = ['DELIVERED', 'PARTIALLY_DELIVERED', 'APPROVED', 'AWAITING_SHOP_VERIFICATION'];
+      const responses = await Promise.all(statuses.map((s) => requestService.getRequests(s, 1, 100)));
       let list = [];
-      if (resDelivered.success) list = [...list, ...(resDelivered.data.requests || [])];
-      if (resPartial.success) list = [...list, ...(resPartial.data.requests || [])];
+      responses.forEach((res) => {
+        if (res.success) list = [...list, ...(res.data.requests || [])];
+      });
       const uniqueMap = new Map();
       list.forEach((item) => uniqueMap.set(item.id, item));
-      setRequests(Array.from(uniqueMap.values()));
+      // Only show rows that actually need requester action: catalog items awaiting
+      // receipt verification, or approved shop items awaiting purchase declaration.
+      const actionable = Array.from(uniqueMap.values()).filter(
+        (r) => r.status === 'DELIVERED' || r.status === 'PARTIALLY_DELIVERED' || isShopDeclarationPending(r)
+      );
+      setRequests(actionable);
     } catch (err) {
       console.error('Failed to load delivered requests:', err);
     } finally {
@@ -123,6 +145,81 @@ const Verification = () => {
       setPaymentProofUrl(reader.result);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleOpenShopModal = async (req) => {
+    let fullReq = req;
+    try {
+      const res = await requestService.getRequestById(req.id);
+      if (res.success) fullReq = res.data;
+    } catch (_) {}
+
+    setSelectedShopReq(fullReq);
+    setShopBillUrls([]);
+    setShopPaymentProofUrls([]);
+    setShopNotes('');
+    setShopError('');
+    setShopModalOpen(true);
+  };
+
+  const readFilesAsDataUrls = (fileList, onDone) => {
+    const files = Array.from(fileList || []);
+    const oversized = files.some((f) => f.size > 5 * 1024 * 1024);
+    if (oversized) {
+      setShopError('Each file must be less than 5MB.');
+      return;
+    }
+    Promise.all(
+      files.map(
+        (file) =>
+          new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          })
+      )
+    ).then(onDone);
+  };
+
+  const handleShopBillUpload = (e) => {
+    readFilesAsDataUrls(e.target.files, (urls) => setShopBillUrls((prev) => [...prev, ...urls]));
+    e.target.value = '';
+  };
+
+  const handleShopPaymentProofUpload = (e) => {
+    readFilesAsDataUrls(e.target.files, (urls) => setShopPaymentProofUrls((prev) => [...prev, ...urls]));
+    e.target.value = '';
+  };
+
+  const handleSubmitShopVerification = async () => {
+    setShopError('');
+    if (shopBillUrls.length === 0) {
+      setShopError('At least one bill attachment is required.');
+      return;
+    }
+    if (shopPaymentProofUrls.length === 0) {
+      setShopError('At least one payment proof attachment is required.');
+      return;
+    }
+
+    setShopSubmitting(true);
+    try {
+      const payload = {
+        verificationNotes: shopNotes,
+        billUrls: shopBillUrls,
+        paymentProofUrls: shopPaymentProofUrls,
+      };
+      const res = await requestService.processShopVerification(selectedShopReq.id, payload);
+      if (res.success) {
+        setShopModalOpen(false);
+        fetchDeliveredRequests();
+      }
+    } catch (err) {
+      setShopError(err.message || 'Shop item purchase declaration failed');
+    } finally {
+      setShopSubmitting(false);
+    }
   };
 
   const handleFieldChange = (itemId, field, valStr) => {
@@ -254,15 +351,28 @@ const Verification = () => {
                   <TableCell><StatusChip status={row.status} /></TableCell>
                   <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                     <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
-                      <Button
-                        variant="contained"
-                        size="small"
-                        startIcon={<VerifiedIcon />}
-                        onClick={() => handleOpenVerifyModal(row)}
-                        sx={{ backgroundColor: '#2B6CB0' }}
-                      >
-                        Verify Receipt
-                      </Button>
+                      {(row.status === 'DELIVERED' || row.status === 'PARTIALLY_DELIVERED') && (
+                        <Button
+                          variant="contained"
+                          size="small"
+                          startIcon={<VerifiedIcon />}
+                          onClick={() => handleOpenVerifyModal(row)}
+                          sx={{ backgroundColor: '#2B6CB0' }}
+                        >
+                          Verify Receipt
+                        </Button>
+                      )}
+                      {isShopDeclarationPending(row) && (
+                        <Button
+                          variant="contained"
+                          size="small"
+                          startIcon={<StorefrontIcon />}
+                          onClick={() => handleOpenShopModal(row)}
+                          sx={{ backgroundColor: '#D97706', '&:hover': { backgroundColor: '#B45309' } }}
+                        >
+                          Declare Shop Purchase
+                        </Button>
+                      )}
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -479,6 +589,136 @@ const Verification = () => {
             sx={{ backgroundColor: '#2F855A' }}
           >
             Finalize Verification
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Shop Item Purchase Declaration Dialog */}
+      <Dialog open={shopModalOpen} onClose={() => setShopModalOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ backgroundColor: '#1A202C', color: '#FFFFFF', fontWeight: 700, px: 3, py: 2 }}>
+          Declare Shop Purchase: {selectedShopReq?.requestNo} ({selectedShopReq?.branch?.name})
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3, pb: 2, px: 3 }}>
+          {shopError && <Alert severity="error" sx={{ mb: 2.5 }}>{shopError}</Alert>}
+
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
+            Approved Shop Items (Purchased from a Nearby Shop):
+          </Typography>
+          <Table size="small" sx={{ mb: 3 }}>
+            <TableHead>
+              <TableRow sx={{ backgroundColor: '#FEF3C7' }}>
+                <TableCell sx={{ fontWeight: 700 }}>Item</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Approved Qty</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {getApprovedShopItems(selectedShopReq || {}).map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell sx={{ fontWeight: 600 }}>{item.itemName}</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>{item.approvalItem.approvedQty}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+
+          {/* Bill Attachment Upload (multiple) */}
+          <Paper sx={{ p: 2, mb: 2, backgroundColor: '#F8FAFC', border: shopBillUrls.length === 0 ? '1px solid #E53E3E' : 'none' }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#2D3748' }}>
+              🧾 Bill Attachment(s) (Image/PDF, multiple allowed): *
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 1.5, flexWrap: 'wrap' }}>
+              <Button variant="outlined" component="label" size="small" color={shopBillUrls.length === 0 ? 'error' : 'primary'}>
+                Upload Bill(s) *
+                <input type="file" hidden multiple accept="image/*,application/pdf" onChange={handleShopBillUpload} />
+              </Button>
+              {shopBillUrls.length === 0 && (
+                <Typography variant="caption" color="error" sx={{ fontWeight: 600 }}>
+                  At least one bill attachment is required
+                </Typography>
+              )}
+            </Box>
+            {shopBillUrls.length > 0 && (
+              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                {shopBillUrls.map((url, idx) => (
+                  <Box key={idx} sx={{ p: 1, border: '1px dashed #3182CE', borderRadius: 1, backgroundColor: '#FFFFFF', position: 'relative' }}>
+                    {url.startsWith('data:application/pdf') ? (
+                      <Typography variant="caption" sx={{ color: '#2F855A', fontWeight: 600 }}>PDF Document #{idx + 1}</Typography>
+                    ) : (
+                      <Box component="img" src={url} alt={`Bill ${idx + 1}`} sx={{ height: 80, borderRadius: 1 }} />
+                    )}
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => setShopBillUrls((prev) => prev.filter((_, i) => i !== idx))}
+                      sx={{ position: 'absolute', top: -10, right: -10, backgroundColor: '#FFFFFF', boxShadow: 1 }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </Paper>
+
+          {/* Payment Proof Attachment Upload (multiple) */}
+          <Paper sx={{ p: 2, mb: 2, backgroundColor: '#F8FAFC', border: shopPaymentProofUrls.length === 0 ? '1px solid #E53E3E' : 'none' }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#2D3748' }}>
+              📄 Payment Proof Attachment(s) (Image/PDF, multiple allowed): *
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 1.5, flexWrap: 'wrap' }}>
+              <Button variant="outlined" component="label" size="small" color={shopPaymentProofUrls.length === 0 ? 'error' : 'primary'}>
+                Upload Payment Proof(s) *
+                <input type="file" hidden multiple accept="image/*,application/pdf" onChange={handleShopPaymentProofUpload} />
+              </Button>
+              {shopPaymentProofUrls.length === 0 && (
+                <Typography variant="caption" color="error" sx={{ fontWeight: 600 }}>
+                  At least one payment proof attachment is required
+                </Typography>
+              )}
+            </Box>
+            {shopPaymentProofUrls.length > 0 && (
+              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                {shopPaymentProofUrls.map((url, idx) => (
+                  <Box key={idx} sx={{ p: 1, border: '1px dashed #3182CE', borderRadius: 1, backgroundColor: '#FFFFFF', position: 'relative' }}>
+                    {url.startsWith('data:application/pdf') ? (
+                      <Typography variant="caption" sx={{ color: '#2F855A', fontWeight: 600 }}>PDF Document #{idx + 1}</Typography>
+                    ) : (
+                      <Box component="img" src={url} alt={`Payment Proof ${idx + 1}`} sx={{ height: 80, borderRadius: 1 }} />
+                    )}
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => setShopPaymentProofUrls((prev) => prev.filter((_, i) => i !== idx))}
+                      sx={{ position: 'absolute', top: -10, right: -10, backgroundColor: '#FFFFFF', boxShadow: 1 }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </Paper>
+
+          <TextField
+            label="Purchase Notes (Optional)"
+            multiline
+            rows={2}
+            fullWidth
+            value={shopNotes}
+            onChange={(e) => setShopNotes(e.target.value)}
+            placeholder="Notes about the shop, purchase conditions, etc."
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setShopModalOpen(false)} color="inherit">Cancel</Button>
+          <Button
+            variant="contained"
+            startIcon={<StorefrontIcon />}
+            onClick={handleSubmitShopVerification}
+            disabled={shopSubmitting || shopBillUrls.length === 0 || shopPaymentProofUrls.length === 0}
+            sx={{ backgroundColor: '#D97706', '&:hover': { backgroundColor: '#B45309' } }}
+          >
+            {shopSubmitting ? 'Submitting...' : 'Confirm Purchase'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box, Typography, Paper, Table, TableHead, TableRow, TableCell, TableBody,
-  Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Alert, CircularProgress, Chip
+  Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Alert, CircularProgress, Chip,
+  Select, MenuItem, FormControl, InputLabel
 } from '@mui/material';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import Inventory2Icon from '@mui/icons-material/Inventory2';
 import { requestService } from '../services/requestService';
 import StatusChip from '../components/common/StatusChip';
-import { formatDate } from '../utils/formatters';
+import { formatDateTime } from '../utils/formatters';
 
 const Deliveries = () => {
   const [requests, setRequests] = useState([]);
@@ -19,6 +21,10 @@ const Deliveries = () => {
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [overallModalOpen, setOverallModalOpen] = useState(false);
+  const [overallDeptFilter, setOverallDeptFilter] = useState('ALL');
+  const [overallFromDate, setOverallFromDate] = useState('');
+  const [overallToDate, setOverallToDate] = useState('');
 
   useEffect(() => {
     fetchApprovedRequests();
@@ -48,6 +54,7 @@ const Deliveries = () => {
     const initialDeliveries = {};
 
     (req.items || []).forEach((item) => {
+      if (item.itemKind === 'SHOP') return;
       const pId = Number(item.productId || item.product?.id || item.id);
       const approvedQty = item.approvalItem ? item.approvalItem.approvedQty : item.requestedQty;
       const isRemoved = item.approvalItem ? item.approvalItem.remove : false;
@@ -216,11 +223,90 @@ const Deliveries = () => {
     return acc + (qty * price);
   }, 0);
 
+  // Overall Product Order: aggregate currently requested/approved products (across
+  // all pending requests in this queue) by product, so agency can see combined
+  // quantities for bulk purchasing without opening each request individually.
+  const overallDepartments = Array.from(
+    new Set(requests.map((r) => r.department || 'GENERAL'))
+  ).sort();
+
+  const buildOverallProductTotals = () => {
+    const totalsMap = {};
+
+    const filteredRequests = requests.filter((req) => {
+      const reqDept = req.department || 'GENERAL';
+      if (overallDeptFilter !== 'ALL' && reqDept !== overallDeptFilter) return false;
+
+      if (overallFromDate || overallToDate) {
+        if (!req.approvedAt) return false;
+        const approvedAt = new Date(req.approvedAt);
+        if (overallFromDate && approvedAt < new Date(overallFromDate)) return false;
+        if (overallToDate && approvedAt > new Date(overallToDate)) return false;
+      }
+
+      return true;
+    });
+
+    filteredRequests.forEach((req) => {
+      (req.items || []).forEach((item) => {
+        if (item.itemKind === 'SHOP') return;
+
+        const pId = Number(item.productId || item.product?.id || item.id);
+        const isRemoved = item.approvalItem ? item.approvalItem.remove : false;
+        const approvedQty = item.approvalItem ? item.approvalItem.approvedQty : item.requestedQty;
+        if (isRemoved) return;
+
+        if (!totalsMap[pId]) {
+          totalsMap[pId] = {
+            productId: pId,
+            name: item.productName || item.product?.name || `Product #${pId}`,
+            unit: item.productUnit || item.product?.unit || '',
+            totalRequestedQty: 0,
+            totalApprovedQty: 0,
+            totalDeliveredQty: 0,
+            totalUnavailableQty: 0,
+          };
+        }
+
+        totalsMap[pId].totalRequestedQty += Number(item.requestedQty || 0);
+        totalsMap[pId].totalApprovedQty += Number(approvedQty || 0);
+
+        (req.deliveries || []).forEach((d) => {
+          (d.items || []).forEach((di) => {
+            if (Number(di.productId || di.product?.id) === pId) {
+              totalsMap[pId].totalDeliveredQty += Number(di.deliveredQty || 0);
+              totalsMap[pId].totalUnavailableQty += Number(di.unavailableQty || 0);
+            }
+          });
+        });
+      });
+    });
+
+    return Object.values(totalsMap)
+      .map((t) => ({
+        ...t,
+        remainingQty: Math.max(0, t.totalApprovedQty - (t.totalDeliveredQty + t.totalUnavailableQty)),
+      }))
+      .sort((a, b) => b.remainingQty - a.remainingQty);
+  };
+
+  const overallProductTotals = overallModalOpen ? buildOverallProductTotals() : [];
+
   return (
     <Box>
-      <Typography variant="h4" sx={{ fontWeight: 700, mb: 3 }}>
-        Agency Delivery Management
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700 }}>
+          Agency Delivery Management
+        </Typography>
+        <Button
+          variant="contained"
+          startIcon={<Inventory2Icon />}
+          onClick={() => setOverallModalOpen(true)}
+          sx={{ backgroundColor: '#2F855A', '&:hover': { backgroundColor: '#276749' } }}
+        >
+          Overall Product Order
+        </Button>
+      </Box>
 
       <Paper sx={{ width: '100%', overflow: 'hidden' }}>
         {loading ? (
@@ -245,7 +331,7 @@ const Deliveries = () => {
                   <TableCell><Chip label={row.department || 'GENERAL'} size="small" color="primary" sx={{ fontWeight: 700 }} /></TableCell>
                   <TableCell>{row.branch?.name}</TableCell>
                   <TableCell>{row.requester?.name}</TableCell>
-                  <TableCell>{formatDate(row.approvedAt)}</TableCell>
+                  <TableCell>{formatDateTime(row.approvedAt)}</TableCell>
                   <TableCell><StatusChip status={row.status} /></TableCell>
                   <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                     <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
@@ -436,6 +522,92 @@ const Deliveries = () => {
           >
             Complete Delivery Dispatch
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Overall Product Order Dialog */}
+      <Dialog open={overallModalOpen} onClose={() => setOverallModalOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ backgroundColor: '#1A202C', color: '#FFFFFF', fontWeight: 700, px: 3, py: 2 }}>
+          Overall Product Order (Current Delivery Queue)
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3, pb: 2, px: 3 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Combined product quantities across all currently requested orders awaiting delivery.
+          </Typography>
+
+          <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+            <FormControl size="small" sx={{ minWidth: 180 }}>
+              <InputLabel>Department</InputLabel>
+              <Select
+                label="Department"
+                value={overallDeptFilter}
+                onChange={(e) => setOverallDeptFilter(e.target.value)}
+              >
+                <MenuItem value="ALL">All Departments</MenuItem>
+                {overallDepartments.map((d) => (
+                  <MenuItem key={d} value={d}>{d}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Approved From"
+              type="datetime-local"
+              size="small"
+              InputLabelProps={{ shrink: true }}
+              value={overallFromDate}
+              onChange={(e) => setOverallFromDate(e.target.value)}
+            />
+            <TextField
+              label="Approved To"
+              type="datetime-local"
+              size="small"
+              InputLabelProps={{ shrink: true }}
+              value={overallToDate}
+              onChange={(e) => setOverallToDate(e.target.value)}
+            />
+            <Button
+              size="small"
+              onClick={() => {
+                setOverallDeptFilter('ALL');
+                setOverallFromDate('');
+                setOverallToDate('');
+              }}
+            >
+              Clear Filters
+            </Button>
+          </Box>
+
+          {overallProductTotals.length === 0 ? (
+            <Typography variant="body1" color="text.secondary" sx={{ p: 4, textAlign: 'center' }}>
+              No products currently pending delivery.
+            </Typography>
+          ) : (
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#EBF8FF' }}>
+                  <TableCell sx={{ fontWeight: 700 }}>Product</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Unit</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Total Requested Qty</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Total Approved Qty</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Remaining to Deliver</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {overallProductTotals.map((t) => (
+                  <TableRow key={t.productId} hover>
+                    <TableCell sx={{ fontWeight: 600 }}>{t.name}</TableCell>
+                    <TableCell>{t.unit}</TableCell>
+                    <TableCell align="right">{t.totalRequestedQty}</TableCell>
+                    <TableCell align="right">{t.totalApprovedQty}</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, color: '#2B6CB0' }}>{t.remainingQty}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOverallModalOpen(false)} variant="contained" color="primary">Close</Button>
         </DialogActions>
       </Dialog>
     </Box>

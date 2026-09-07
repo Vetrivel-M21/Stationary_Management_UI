@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Box, Typography, Paper, Grid, Card, CardContent, Button, TextField, Table,
   TableHead, TableRow, TableCell, TableBody, IconButton, Alert, CircularProgress,
-  FormControl, InputLabel, Select, MenuItem, FormHelperText, Chip
+  FormControl, InputLabel, Select, MenuItem, FormHelperText, Chip, Autocomplete
 } from '@mui/material';
 import AddShoppingCartIcon from '@mui/icons-material/AddShoppingCart';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -11,11 +11,14 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import StorefrontIcon from '@mui/icons-material/Storefront';
+import AddIcon from '@mui/icons-material/Add';
 import { useNavigate } from 'react-router-dom';
 import { productService } from '../services/productService';
 import { requestService } from '../services/requestService';
 import { branchService } from '../services/branchService';
 import { useAuth } from '../contexts/AuthContext';
+import { DEPARTMENTS } from '../constants/departments';
 
 const NewRequest = () => {
   const { user } = useAuth();
@@ -26,7 +29,7 @@ const NewRequest = () => {
 
   const [products, setProducts] = useState([]);
   const [branches, setBranches] = useState([]);
-  const [branchInput, setBranchInput] = useState('');
+  const [selectedBranch, setSelectedBranch] = useState(null);
 
   // Applicant Details - Start EMPTY by default per user request
   const [applicantName, setApplicantName] = useState('');
@@ -37,6 +40,8 @@ const NewRequest = () => {
   const [fieldErrors, setFieldErrors] = useState({});
 
   const [cart, setCart] = useState([]);
+  const [shopItemName, setShopItemName] = useState('');
+  const [shopItemQty, setShopItemQty] = useState(1);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -51,6 +56,19 @@ const NewRequest = () => {
     }
   }, [isRequester, user]);
 
+  useEffect(() => {
+    setSelectedBranch(null);
+    if (!department) {
+      setBranches([]);
+      return;
+    }
+    branchService.getBranches('', 1, 100, department)
+      .then((res) => {
+        if (res.success) setBranches(res.data.branches || []);
+      })
+      .catch((err) => console.error('Failed to load branches for department:', err));
+  }, [department]);
+
   const fetchInitialData = async () => {
     setLoading(true);
     try {
@@ -60,15 +78,6 @@ const NewRequest = () => {
       }
     } catch (err) {
       console.error('Failed to load products:', err);
-    }
-
-    try {
-      const branchRes = await branchService.getBranches('', 1, 100);
-      if (branchRes.success) {
-        setBranches(branchRes.data.branches || []);
-      }
-    } catch (err) {
-      console.error('Failed to load branches:', err);
     } finally {
       setLoading(false);
     }
@@ -86,24 +95,42 @@ const NewRequest = () => {
   };
 
   const handleAddToCart = (product) => {
-    const existingIndex = cart.findIndex((item) => item.productId === product.id);
+    const key = `cat-${product.id}`;
+    const existingIndex = cart.findIndex((item) => item.key === key);
     if (existingIndex > -1) {
       const updated = [...cart];
       updated[existingIndex].requestedQty += 1;
       setCart(updated);
     } else {
-      setCart([...cart, { productId: product.id, name: product.name, unit: product.unit, category: product.category, requestedQty: 1 }]);
+      setCart([...cart, { key, kind: 'CATALOG', productId: product.id, name: product.name, unit: product.unit, category: product.category, requestedQty: 1 }]);
     }
   };
 
-  const handleQtyChange = (productId, newQty) => {
-    const qty = parseInt(newQty, 10);
-    if (isNaN(qty) || qty <= 0) return;
-    setCart(cart.map((item) => (item.productId === productId ? { ...item, requestedQty: qty } : item)));
+  const handleAddShopItem = () => {
+    const name = shopItemName.trim();
+    const qty = parseInt(shopItemQty, 10);
+    if (!name) {
+      setError('Enter a name for the shop item before adding it.');
+      return;
+    }
+    if (isNaN(qty) || qty <= 0) {
+      setError('Enter a valid quantity for the shop item.');
+      return;
+    }
+    setError('');
+    setCart([...cart, { key: `shop-${Date.now()}`, kind: 'SHOP', itemName: name, requestedQty: qty }]);
+    setShopItemName('');
+    setShopItemQty(1);
   };
 
-  const handleRemoveItem = (productId) => {
-    setCart(cart.filter((item) => item.productId !== productId));
+  const handleQtyChange = (key, newQty) => {
+    const qty = parseInt(newQty, 10);
+    if (isNaN(qty) || qty <= 0) return;
+    setCart(cart.map((item) => (item.key === key ? { ...item, requestedQty: qty } : item)));
+  };
+
+  const handleRemoveItem = (key) => {
+    setCart(cart.filter((item) => item.key !== key));
   };
 
   const handleSubmit = async () => {
@@ -134,8 +161,8 @@ const NewRequest = () => {
       newErrors.department = 'Department selection is required';
     }
 
-    if (!branchInput.trim()) {
-      newErrors.branchInput = 'Target Branch detail is required';
+    if (!selectedBranch) {
+      newErrors.branchInput = 'Please select a target branch from the list';
     }
 
     if (!location.trim()) {
@@ -149,25 +176,22 @@ const NewRequest = () => {
     }
 
     if (cart.length === 0) {
-      setError('Please add at least one product to submit a request.');
+      setError('Please add at least one catalog product or shop item to submit a request.');
       return;
     }
-
-    const matchedBranch = branches.find(
-      (b) => b.name.toLowerCase() === branchInput.trim().toLowerCase() || b.code.toLowerCase() === branchInput.trim().toLowerCase()
-    );
 
     setSubmitting(true);
     try {
       const payload = {
-        branchId: matchedBranch ? Number(matchedBranch.id) : 0,
-        branchName: branchInput.trim(),
+        branchId: Number(selectedBranch.id),
+        branchName: selectedBranch.name,
         applicantName: applicantName.trim(),
         applicantMobile: cleanMobile,
         applicantEmail: applicantEmail.trim(),
         department,
         location: location.trim(),
-        items: cart.map((i) => ({ productId: i.productId, requestedQty: i.requestedQty })),
+        items: cart.filter((i) => i.kind === 'CATALOG').map((i) => ({ productId: i.productId, requestedQty: i.requestedQty })),
+        shopItems: cart.filter((i) => i.kind === 'SHOP').map((i) => ({ itemName: i.itemName, requestedQty: i.requestedQty })),
       };
 
       const res = await requestService.createRequest(payload);
@@ -263,9 +287,9 @@ const NewRequest = () => {
                 disabled={isRequester}
                 onChange={(e) => handleFieldChange('department', e.target.value, setDepartment)}
               >
-                <MenuItem value="GOLD LOAN">GOLD LOAN</MenuItem>
-                <MenuItem value="CHIT FUND">CHIT FUND</MenuItem>
-                <MenuItem value="OTHERS">OTHERS</MenuItem>
+                {DEPARTMENTS.map((dept) => (
+                  <MenuItem key={dept} value={dept}>{dept}</MenuItem>
+                ))}
               </Select>
               {fieldErrors.department ? (
                 <FormHelperText>{fieldErrors.department}</FormHelperText>
@@ -276,16 +300,30 @@ const NewRequest = () => {
           </Grid>
 
           <Grid item xs={12} sm={6}>
-            <TextField
-              label="Target Branch / Branch Detail"
-              fullWidth
-              required
-              size="small"
-              value={branchInput}
-              onChange={(e) => handleFieldChange('branchInput', e.target.value, setBranchInput)}
-              placeholder="e.g. West Coast Branch / North Region Branch"
-              error={Boolean(fieldErrors.branchInput)}
-              helperText={fieldErrors.branchInput}
+            <Autocomplete
+              options={branches}
+              getOptionLabel={(b) => b.name}
+              isOptionEqualToValue={(a, b) => a.id === b.id}
+              value={selectedBranch}
+              onChange={(e, newValue) => {
+                setSelectedBranch(newValue);
+                if (fieldErrors.branchInput) {
+                  setFieldErrors((prev) => ({ ...prev, branchInput: '' }));
+                }
+              }}
+              disabled={!department}
+              noOptionsText={department ? 'No branches assigned to this department yet. Contact an admin.' : 'Select a department first'}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Target Branch"
+                  required
+                  size="small"
+                  placeholder="Search and select a branch"
+                  error={Boolean(fieldErrors.branchInput)}
+                  helperText={fieldErrors.branchInput || (department && branches.length === 0 ? 'No branches assigned to this department yet' : '')}
+                />
+              )}
             />
           </Grid>
 
@@ -302,6 +340,58 @@ const NewRequest = () => {
               error={Boolean(fieldErrors.location)}
               helperText={fieldErrors.location || 'Provide exact location, floor, and counter details'}
             />
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {/* Shop Item (Non-Catalog) Section */}
+      <Paper sx={{ p: 3, mb: 4, borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderTop: '4px solid #D97706' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+          <Box sx={{ width: 36, height: 36, borderRadius: '50%', backgroundColor: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <StorefrontIcon sx={{ color: '#D97706', fontSize: 20 }} />
+          </Box>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: '#0F172A' }}>
+              Add a Shop Item (Not in Catalog)
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748B' }}>
+              For items bought from a nearby shop instead of the agency. These go only to the Approver and are settled by you with a bill and payment proof after approval.
+            </Typography>
+          </Box>
+        </Box>
+
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} sm={7}>
+            <TextField
+              label="Item Name"
+              fullWidth
+              size="small"
+              value={shopItemName}
+              onChange={(e) => setShopItemName(e.target.value)}
+              placeholder="e.g. Custom Rubber Stamp"
+            />
+          </Grid>
+          <Grid item xs={7} sm={3}>
+            <TextField
+              label="Quantity"
+              type="number"
+              fullWidth
+              size="small"
+              value={shopItemQty}
+              onChange={(e) => setShopItemQty(e.target.value)}
+              inputProps={{ min: 1 }}
+            />
+          </Grid>
+          <Grid item xs={5} sm={2}>
+            <Button
+              variant="contained"
+              fullWidth
+              startIcon={<AddIcon />}
+              onClick={handleAddShopItem}
+              sx={{ backgroundColor: '#D97706', fontWeight: 700, textTransform: 'none', borderRadius: 2, '&:hover': { backgroundColor: '#B45309' } }}
+            >
+              Add
+            </Button>
           </Grid>
         </Grid>
       </Paper>
@@ -413,19 +503,24 @@ const NewRequest = () => {
                   </TableHead>
                   <TableBody>
                     {cart.map((item) => (
-                      <TableRow key={item.productId} hover>
-                        <TableCell sx={{ fontWeight: 600, color: '#1E293B' }}>{item.name}</TableCell>
+                      <TableRow key={item.key} hover>
+                        <TableCell sx={{ fontWeight: 600, color: '#1E293B' }}>
+                          {item.kind === 'SHOP' ? item.itemName : item.name}
+                          {item.kind === 'SHOP' && (
+                            <Chip label="Shop Item" size="small" sx={{ ml: 1, backgroundColor: '#FEF3C7', color: '#92400E', fontWeight: 700, fontSize: '0.65rem' }} />
+                          )}
+                        </TableCell>
                         <TableCell>
                           <TextField
                             type="number"
                             size="small"
                             value={item.requestedQty}
-                            onChange={(e) => handleQtyChange(item.productId, e.target.value)}
+                            onChange={(e) => handleQtyChange(item.key, e.target.value)}
                             inputProps={{ min: 1, style: { padding: '4px 8px', fontWeight: 700 } }}
                           />
                         </TableCell>
                         <TableCell align="right">
-                          <IconButton color="error" size="small" onClick={() => handleRemoveItem(item.productId)} title="Remove Item">
+                          <IconButton color="error" size="small" onClick={() => handleRemoveItem(item.key)} title="Remove Item">
                             <DeleteIcon fontSize="small" />
                           </IconButton>
                         </TableCell>

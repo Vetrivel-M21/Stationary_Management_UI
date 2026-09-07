@@ -19,10 +19,14 @@ export const requestService = {
   processVerification: async (id, verificationData) => {
     return await api.post(`/requests/${id}/verify`, verificationData);
   },
+  processShopVerification: async (id, shopVerificationData) => {
+    return await api.post(`/requests/${id}/shop-items/verify`, shopVerificationData);
+  },
   getDashboardMetrics: async () => {
     return await api.get('/dashboard/metrics');
   },
-  getAuditLogs: async (page = 1, limit = 20) => {
-    return await api.get(`/dashboard/audit-logs?page=${page}&limit=${limit}`);
+  getAuditLogs: async (page = 1, limit = 20, filters = {}) => {
+    const params = new URLSearchParams({ page, limit, ...filters });
+    return await api.get(`/dashboard/audit-logs?${params.toString()}`);
   },
 };

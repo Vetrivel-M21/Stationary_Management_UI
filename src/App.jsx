@@ -18,6 +18,7 @@ import Deliveries from './pages/Deliveries';
 import Verification from './pages/Verification';
 import Monitor from './pages/Monitor';
 import AuditLogs from './pages/AuditLogs';
+import ProductHistory from './pages/ProductHistory';
 import Reports from './pages/Reports';
 
 function App() {
@@ -59,6 +60,9 @@ function App() {
                 </Route>
                 <Route path="/audit-logs" element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
                   <Route path="" element={<AuditLogs />} />
+                </Route>
+                <Route path="/products/history" element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+                  <Route path="" element={<ProductHistory />} />
                 </Route>
               </Route>
             </Route>

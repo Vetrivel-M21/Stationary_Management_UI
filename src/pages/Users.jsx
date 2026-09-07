@@ -12,6 +12,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import { userService } from '../services/userService';
 import { branchService } from '../services/branchService';
 import StatusChip from '../components/common/StatusChip';
+import { DEPARTMENTS } from '../constants/departments';
 
 const roles = [
   { id: 1, name: 'ADMIN' },
@@ -21,7 +22,7 @@ const roles = [
   { id: 5, name: 'MONITOR' },
 ];
 
-const departmentsList = ['GOLD LOAN', 'CHIT FUND', 'OTHERS', 'NIDHI'];
+const departmentsList = DEPARTMENTS;
 
 const Users = () => {
   const [users, setUsers] = useState([]);

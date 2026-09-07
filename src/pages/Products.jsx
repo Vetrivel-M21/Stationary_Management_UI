@@ -8,6 +8,8 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
+import HistoryIcon from '@mui/icons-material/History';
+import { useNavigate } from 'react-router-dom';
 import { productService } from '../services/productService';
 import StatusChip from '../components/common/StatusChip';
 import { useAuth } from '../contexts/AuthContext';
@@ -16,6 +18,7 @@ const categories = ['Writing Instruments', 'Paper Products', 'Desk Supplies', 'F
 
 const Products = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const role = typeof user?.role === 'object' ? user?.role?.name : (user?.role || '');
   const isAdmin = role === 'ADMIN';
   const isAgency = role === 'AGENCY';
@@ -102,11 +105,18 @@ const Products = () => {
         <Typography variant="h4" sx={{ fontWeight: 700 }}>
           Product Catalog
         </Typography>
-        {canManage && (
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenModal()} sx={{ backgroundColor: '#2B6CB0' }}>
-            Add New Product
-          </Button>
-        )}
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          {isAdmin && (
+            <Button variant="outlined" startIcon={<HistoryIcon />} onClick={() => navigate('/products/history')}>
+              History
+            </Button>
+          )}
+          {canManage && (
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenModal()} sx={{ backgroundColor: '#2B6CB0' }}>
+              Add New Product
+            </Button>
+          )}
+        </Box>
       </Box>
 
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
@@ -148,7 +158,7 @@ const Products = () => {
                 <TableCell>Unit Price (₹)</TableCell>
                 <TableCell>Description</TableCell>
                 <TableCell>Status</TableCell>
-                {isAdmin && <TableCell align="right">Actions</TableCell>}
+                {canManage && <TableCell align="right">Actions</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -161,14 +171,16 @@ const Products = () => {
                   <TableCell>{row.unitPrice ? `₹${row.unitPrice}` : '-'}</TableCell>
                   <TableCell>{row.description || '-'}</TableCell>
                   <TableCell><StatusChip status={row.status} /></TableCell>
-                  {isAdmin && (
+                  {canManage && (
                     <TableCell align="right">
                       <IconButton color="primary" onClick={() => handleOpenModal(row)}>
                         <EditIcon />
                       </IconButton>
-                      <IconButton color="error" onClick={() => handleDelete(row.id)}>
-                        <DeleteIcon />
-                      </IconButton>
+                      {isAdmin && (
+                        <IconButton color="error" onClick={() => handleDelete(row.id)}>
+                          <DeleteIcon />
+                        </IconButton>
+                      )}
                     </TableCell>
                   )}
                 </TableRow>

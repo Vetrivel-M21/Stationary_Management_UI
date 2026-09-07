@@ -29,6 +29,7 @@ const NavigationDrawer = ({ open, onClose, isMobile }) => {
     if (role === 'ADMIN') {
       items.push(
         { text: 'Product Catalog', icon: <InventoryIcon />, path: '/products' },
+        { text: 'Product History', icon: <HistoryIcon />, path: '/products/history' },
         { text: 'Branches', icon: <BusinessIcon />, path: '/branches' },
         { text: 'Users & RBAC', icon: <PeopleIcon />, path: '/users' },
         { text: 'Create New Request', icon: <PostAddIcon />, path: '/requests/new' },
