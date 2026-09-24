@@ -164,6 +164,7 @@ const Monitor = () => {
                   <MenuItem value="DELIVERED">DELIVERED</MenuItem>
                   <MenuItem value="COMPLETED">COMPLETED</MenuItem>
                   <MenuItem value="REJECTED">REJECTED</MenuItem>
+                  <MenuItem value="REJECTED_BY_AGENCY">REJECTED BY AGENCY</MenuItem>
                 </Select>
               </FormControl>
             </Grid>

@@ -37,6 +37,12 @@ const LoginLayout = ({ children }) => {
           </Typography>
           {children}
         </Paper>
+        <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)', mt: 3, textAlign: 'center' }}>
+          Website designed and developed by{' '}
+          <Box component="span" sx={{ color: '#60A5FA', fontWeight: 700 }}>
+            ARMSS INFO TECH
+          </Box>
+        </Typography>
       </Container>
     </Box>
   );

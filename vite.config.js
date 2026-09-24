@@ -8,6 +8,9 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       port: parseInt(env.VITE_PORT) || 4170,
+      watch: {
+        ignored: ['**/dist.zip'],
+      },
       proxy: {
         '/api': {
           target: env.VITE_API_TARGET || 'http://localhost:8091',

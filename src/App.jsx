@@ -5,8 +5,10 @@ import metallicTheme from './styles/metallicTheme';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './routes/ProtectedRoute';
 import DashboardLayout from './layouts/DashboardLayout';
+import GatewayGuard from './components/common/GatewayGuard';
 
 import Login from './pages/Login';
+import TokenInvalid from './pages/TokenInvalid';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Branches from './pages/Branches';
@@ -25,10 +27,12 @@ function App() {
   return (
     <ThemeProvider theme={metallicTheme}>
       <CssBaseline />
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
+      <GatewayGuard>
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/token-invalid" element={<TokenInvalid />} />
+              <Route path="/login" element={<Login />} />
 
             {/* Protected Application Routes */}
             <Route element={<ProtectedRoute />}>
@@ -71,7 +75,8 @@ function App() {
           </Routes>
         </BrowserRouter>
       </AuthProvider>
-    </ThemeProvider>
+    </GatewayGuard>
+  </ThemeProvider>
   );
 }
 

@@ -416,6 +416,11 @@ const Approvals = () => {
                     const isRemoved = item.approvalItem ? item.approvalItem.remove : false;
                     const isRejected = !isSubmitted && (isRemoved || (item.approvalItem && rawApproved === 0));
 
+                    const agencyRejectedItem = !isSubmitted && !isRejected && (selectedReq.deliveries || [])
+                      .flatMap((d) => d.items || [])
+                      .find((di) => Number(di.productId || di.product?.id) === Number(item.productId || item.product?.id) && di.rejected);
+                    const isAgencyRejected = Boolean(agencyRejectedItem);
+
                     let deliveredQty = 0;
                     let agencyUnitPrice = 0;
                     if (!isSubmitted && !isRejected && selectedReq.deliveries && selectedReq.deliveries.length > 0) {
@@ -443,6 +448,8 @@ const Approvals = () => {
                       remarkText = 'Awaiting Approver Review';
                     } else if (isRejected && (!item.approvalItem?.remarks || item.approvalItem.remarks === '-')) {
                       remarkText = 'Rejected by Approver';
+                    } else if (isAgencyRejected) {
+                      remarkText = (agencyRejectedItem.remarks && agencyRejectedItem.remarks !== '-') ? agencyRejectedItem.remarks : 'Rejected by Agency';
                     }
 
                     return (
@@ -458,13 +465,13 @@ const Approvals = () => {
                         <TableCell sx={{ fontWeight: 600, color: isSubmitted ? '#D69E2E' : isRejected ? '#C53030' : 'inherit', fontStyle: isSubmitted ? 'italic' : 'normal' }}>
                           {isSubmitted ? 'Pending Approval' : isRejected ? '0 (Rejected)' : approvedQty}
                         </TableCell>
-                        <TableCell sx={{ color: isSubmitted || isRejected ? 'text.disabled' : '#2F855A', fontWeight: 600 }}>
-                          {isSubmitted || isRejected ? 0 : deliveredQty}
+                        <TableCell sx={{ color: isSubmitted || isRejected || isAgencyRejected ? 'text.disabled' : '#2F855A', fontWeight: 600 }}>
+                          {isSubmitted || isRejected || isAgencyRejected ? 0 : deliveredQty}
                         </TableCell>
                         <TableCell align="right" sx={{ fontWeight: 700, color: isSubmitted ? 'text.secondary' : '#2B6CB0' }}>
                           {isSubmitted ? '-' : `₹${lineApprovedTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
                         </TableCell>
-                        <TableCell sx={{ fontStyle: isSubmitted || isRejected ? 'italic' : 'normal', color: isSubmitted ? '#D69E2E' : isRejected ? '#C53030' : 'inherit' }}>
+                        <TableCell sx={{ fontStyle: isSubmitted || isRejected || isAgencyRejected ? 'italic' : 'normal', color: isSubmitted ? '#D69E2E' : (isRejected || isAgencyRejected) ? '#C53030' : 'inherit' }}>
                           {remarkText}
                         </TableCell>
                       </TableRow>

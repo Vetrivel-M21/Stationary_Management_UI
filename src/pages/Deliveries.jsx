@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   Box, Typography, Paper, Table, TableHead, TableRow, TableCell, TableBody,
   Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Alert, CircularProgress, Chip,
-  Select, MenuItem, FormControl, InputLabel
+  Select, MenuItem, FormControl, InputLabel, Checkbox, FormControlLabel, Tooltip
 } from '@mui/material';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import CancelIcon from '@mui/icons-material/Cancel';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import TableChartIcon from '@mui/icons-material/TableChart';
@@ -94,6 +95,7 @@ const Deliveries = () => {
             remainingQty: remainingQty,
             deliveredQty: remainingQty,
             unavailableQty: 0,
+            rejected: false,
             unitPrice: defaultPrice,
             remarks: '',
           };
@@ -156,6 +158,23 @@ const Deliveries = () => {
         },
       }));
     }
+  };
+
+  const handleRejectToggle = (productId, checked) => {
+    const key = Number(productId);
+    setItemDeliveries((prev) => {
+      const item = prev[key];
+      if (!item) return prev;
+      return {
+        ...prev,
+        [key]: {
+          ...item,
+          rejected: checked,
+          deliveredQty: checked ? 0 : item.remainingQty,
+          unavailableQty: checked ? item.remainingQty : 0,
+        },
+      };
+    });
   };
 
   const handleFileUpload = (e) => {
@@ -222,6 +241,23 @@ const Deliveries = () => {
       }
     } catch (err) {
       setError(err.message || 'Delivery processing failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRejectOrder = async () => {
+    setError('');
+    setSubmitting(true);
+    try {
+      const payload = { action: 'REJECT', deliveryNotes };
+      const res = await requestService.processDelivery(selectedReq.id, payload);
+      if (res.success) {
+        setDeliveryModalOpen(false);
+        fetchApprovedRequests();
+      }
+    } catch (err) {
+      setError(err.message || 'Order rejection failed');
     } finally {
       setSubmitting(false);
     }
@@ -484,6 +520,7 @@ const Deliveries = () => {
                 <TableCell width={110} sx={{ fontWeight: 700 }}>Unavailable Qty</TableCell>
                 <TableCell width={130} sx={{ fontWeight: 700 }}>Unit Price (₹) *</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 700 }}>Line Total (₹)</TableCell>
+                <TableCell align="center" sx={{ fontWeight: 700 }}>Reject</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -497,7 +534,7 @@ const Deliveries = () => {
                 const isPriceMissing = Number(delData.deliveredQty || 0) > 0 && (delData.unitPrice === '' || delData.unitPrice === null || delData.unitPrice === undefined || Number(delData.unitPrice) <= 0);
 
                 return (
-                  <TableRow key={pId}>
+                  <TableRow key={pId} sx={delData.rejected ? { backgroundColor: '#FFF5F5' } : undefined}>
                     <TableCell sx={{ fontWeight: 600 }}>{productName}</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>{delData.approvedQty}</TableCell>
                     <TableCell sx={{ color: '#4A5568' }}>{delData.prevDeliveredQty || 0}</TableCell>
@@ -507,6 +544,7 @@ const Deliveries = () => {
                         type="number"
                         size="small"
                         required
+                        disabled={delData.rejected}
                         inputProps={{ min: 0, max: delData.remainingQty }}
                         value={delData.deliveredQty ?? ''}
                         onChange={(e) => handleFieldChange(pId, 'deliveredQty', e.target.value)}
@@ -517,6 +555,7 @@ const Deliveries = () => {
                       <TextField
                         type="number"
                         size="small"
+                        disabled={delData.rejected}
                         inputProps={{ min: 0, max: delData.remainingQty }}
                         value={delData.unavailableQty ?? ''}
                         onChange={(e) => handleFieldChange(pId, 'unavailableQty', e.target.value)}
@@ -526,6 +565,7 @@ const Deliveries = () => {
                       <TextField
                         type="number"
                         size="small"
+                        disabled={delData.rejected}
                         required={Number(delData.deliveredQty || 0) > 0}
                         inputProps={{ min: 0, step: 0.5 }}
                         value={delData.unitPrice ?? ''}
@@ -536,6 +576,13 @@ const Deliveries = () => {
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700, color: '#2B6CB0' }}>
                       ₹{lineTotal.toFixed(2)}
+                    </TableCell>
+                    <TableCell align="center">
+                      <Checkbox
+                        checked={Boolean(delData.rejected)}
+                        onChange={(e) => handleRejectToggle(pId, e.target.checked)}
+                        color="error"
+                      />
                     </TableCell>
                   </TableRow>
                 );
@@ -552,6 +599,17 @@ const Deliveries = () => {
               ₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </Typography>
           </Box>
+
+          <TextField
+            label="Delivery / Rejection Notes"
+            multiline
+            rows={2}
+            fullWidth
+            sx={{ mb: 3 }}
+            value={deliveryNotes}
+            onChange={(e) => setDeliveryNotes(e.target.value)}
+            placeholder="Notes for this delivery, or the reason if rejecting an item / the whole order..."
+          />
 
           {/* Bill Attachment & Notes Upload */}
           <Paper sx={{ p: 2, mb: 2, backgroundColor: '#F8FAFC', border: !billUrl ? '1px solid #E53E3E' : 'none' }}>
@@ -607,18 +665,35 @@ const Deliveries = () => {
             />
           </Paper>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setDeliveryModalOpen(false)} color="inherit">Cancel</Button>
-          <Button
-            variant="contained"
-            color="primary"
-            disabled={submitting || totalDeliveredQty <= 0 || missingUnitPrice || !billUrl}
-            startIcon={<LocalShippingIcon />}
-            onClick={handleSubmitDelivery}
-            sx={{ backgroundColor: '#2B6CB0' }}
+        <DialogActions sx={{ p: 2, justifyContent: 'space-between' }}>
+          <Tooltip
+            title={selectedReq?.status === 'APPROVED' ? '' : 'Only orders with no delivery yet can be rejected outright — reject remaining items individually instead'}
           >
-            Complete Delivery Dispatch
-          </Button>
+            <span>
+              <Button
+                variant="outlined"
+                color="error"
+                disabled={submitting || selectedReq?.status !== 'APPROVED'}
+                startIcon={<CancelIcon />}
+                onClick={handleRejectOrder}
+              >
+                Reject Order
+              </Button>
+            </span>
+          </Tooltip>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button onClick={() => setDeliveryModalOpen(false)} color="inherit">Cancel</Button>
+            <Button
+              variant="contained"
+              color="primary"
+              disabled={submitting || totalDeliveredQty <= 0 || missingUnitPrice || !billUrl}
+              startIcon={<LocalShippingIcon />}
+              onClick={handleSubmitDelivery}
+              sx={{ backgroundColor: '#2B6CB0' }}
+            >
+              Complete Delivery Dispatch
+            </Button>
+          </Box>
         </DialogActions>
       </Dialog>
 

@@ -104,7 +104,7 @@ const Verification = () => {
       const productId = item.productId || item.product?.id;
       const deliveryItem = deliveryItemMap[productId];
 
-      if (!isRemoved && approvedQty > 0 && deliveryItem) {
+      if (!isRemoved && approvedQty > 0 && deliveryItem && !deliveryItem.rejected) {
         const dispatched = deliveryItem.deliveredQty || 0;
         const unavailable = deliveryItem.unavailableQty || 0;
         const unitPrice = deliveryItem.unitPrice || item.unitPrice || item.product?.unitPrice || 0;

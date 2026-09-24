@@ -29,7 +29,8 @@ const getActiveStep = (status) => {
 const TimelineView = ({ status, request }) => {
   const currentStatus = status || request?.status;
   const activeStep = getActiveStep(currentStatus);
-  const isRejected = currentStatus === 'REJECTED';
+  const isRejected = currentStatus === 'REJECTED' || currentStatus === 'REJECTED_BY_AGENCY';
+  const isAgencyRejected = currentStatus === 'REJECTED_BY_AGENCY';
 
   const getStepDate = (index) => {
     if (!request) return null;
@@ -64,11 +65,11 @@ const TimelineView = ({ status, request }) => {
       {isRejected ? (
         <Box sx={{ p: 2, backgroundColor: '#FFF5F5', borderRadius: 1, border: '1px solid #FEB2B2' }}>
           <Typography variant="body1" color="error" sx={{ fontWeight: 700 }}>
-            This request has been REJECTED.
+            {isAgencyRejected ? 'This request has been REJECTED BY AGENCY.' : 'This request has been REJECTED.'}
           </Typography>
-          {request?.approvedAt && (
+          {(isAgencyRejected ? request?.rejectedAt : request?.approvedAt) && (
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontWeight: 600 }}>
-              Rejected Date & Time: <strong>{formatDateTime(request.approvedAt)}</strong>
+              Rejected Date & Time: <strong>{formatDateTime(isAgencyRejected ? request.rejectedAt : request.approvedAt)}</strong>
             </Typography>
           )}
         </Box>

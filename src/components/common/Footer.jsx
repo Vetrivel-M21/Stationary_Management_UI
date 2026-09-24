@@ -15,7 +15,10 @@ const Footer = () => {
       }}
     >
       <Typography variant="body2" color="text.secondary">
-        Veyon Agency &copy; {new Date().getFullYear()} Enterprise Multi-Branch Solution. All rights reserved.
+        Website designed and developed by{' '}
+        <Box component="span" sx={{ color: '#1976D2', fontWeight: 700 }}>
+          ARMSS INFO TECH
+        </Box>
       </Typography>
     </Box>
   );

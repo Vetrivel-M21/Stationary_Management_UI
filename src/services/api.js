@@ -13,6 +13,18 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    const gatewayDeviceId =
+      sessionStorage.getItem('gateway_device_id') || sessionStorage.getItem('device_id');
+    const gatewayToken =
+      sessionStorage.getItem('gateway_token') || sessionStorage.getItem('device_token');
+    if (gatewayDeviceId) {
+      config.headers['X-Gateway-Device-Id'] = gatewayDeviceId;
+    }
+    if (gatewayToken) {
+      config.headers['X-Gateway-Token'] = gatewayToken;
+    }
+
     return config;
   },
   (error) => Promise.reject(error)

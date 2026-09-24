@@ -199,6 +199,11 @@ const Reports = () => {
         const isRemoved = item.approvalItem ? item.approvalItem.remove : false;
         const isRejected = isRemoved || (item.approvalItem && approvedQty === 0);
 
+        const agencyRejectedItem = !isRejected && (req.deliveries || [])
+          .flatMap((d) => d.items || [])
+          .find((di) => Number(di.productId || di.product?.id) === Number(item.productId || item.product?.id) && di.rejected);
+        const isAgencyRejected = Boolean(agencyRejectedItem);
+
         let deliveredQty = 0;
         let rawUnavailableQty = 0;
         if (!isRejected && req.deliveries && req.deliveries.length > 0) {
@@ -214,11 +219,13 @@ const Reports = () => {
 
         const effectiveApproved = isRejected ? 0 : approvedQty;
         const lineApprovedAmount = effectiveApproved * unitPrice;
-        const lineDeliveredAmount = (isRejected ? 0 : deliveredQty) * unitPrice;
+        const lineDeliveredAmount = (isRejected || isAgencyRejected ? 0 : deliveredQty) * unitPrice;
 
         let remarks = item.approvalItem?.remarks || '-';
         if (isRejected && (!item.approvalItem?.remarks || item.approvalItem.remarks === '-')) {
           remarks = 'Rejected by Approver';
+        } else if (isAgencyRejected) {
+          remarks = (agencyRejectedItem.remarks && agencyRejectedItem.remarks !== '-') ? agencyRejectedItem.remarks : 'Rejected by Agency';
         }
 
         csvRows.push([
@@ -231,7 +238,7 @@ const Reports = () => {
           unitPrice.toFixed(2),
           item.requestedQty,
           isRejected ? 0 : approvedQty,
-          isRejected ? 0 : deliveredQty,
+          isRejected || isAgencyRejected ? 0 : deliveredQty,
           lineApprovedAmount.toFixed(2),
           lineDeliveredAmount.toFixed(2),
           `"${remarks}"`,
@@ -444,6 +451,7 @@ const Reports = () => {
                 <MenuItem value="DELIVERED">DELIVERED</MenuItem>
                 <MenuItem value="COMPLETED">COMPLETED</MenuItem>
                 <MenuItem value="REJECTED">REJECTED</MenuItem>
+                <MenuItem value="REJECTED_BY_AGENCY">REJECTED BY AGENCY</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -602,6 +610,11 @@ const Reports = () => {
                     const isRejected = isRemoved || (item.approvalItem && approvedQty === 0);
                     const unitPrice = getItemUnitPrice(item, selectedReq.deliveries);
 
+                    const agencyRejectedItem = !isRejected && (selectedReq.deliveries || [])
+                      .flatMap((d) => d.items || [])
+                      .find((di) => Number(di.productId || di.product?.id) === Number(item.productId || item.product?.id) && di.rejected);
+                    const isAgencyRejected = Boolean(agencyRejectedItem);
+
                     let deliveredQty = 0;
                     let damagedQty = 0;
                     if (!isRejected && selectedReq.deliveries && selectedReq.deliveries.length > 0) {
@@ -621,6 +634,8 @@ const Reports = () => {
                     let remarkText = item.approvalItem?.remarks || '-';
                     if (isRejected && (!item.approvalItem?.remarks || item.approvalItem.remarks === '-')) {
                       remarkText = 'Rejected by Approver';
+                    } else if (isAgencyRejected) {
+                      remarkText = (agencyRejectedItem.remarks && agencyRejectedItem.remarks !== '-') ? agencyRejectedItem.remarks : 'Rejected by Agency';
                     }
 
                     return (
@@ -636,8 +651,8 @@ const Reports = () => {
                         <TableCell sx={{ fontWeight: 600, color: isRejected ? '#C53030' : 'inherit' }}>
                           {isRejected ? '0 (Rejected)' : approvedQty}
                         </TableCell>
-                        <TableCell sx={{ color: isRejected ? 'text.disabled' : '#2F855A', fontWeight: 600 }}>
-                          {isRejected ? 0 : deliveredQty}
+                        <TableCell sx={{ color: isRejected || isAgencyRejected ? 'text.disabled' : '#2F855A', fontWeight: 600 }}>
+                          {isRejected || isAgencyRejected ? 0 : deliveredQty}
                         </TableCell>
                         <TableCell sx={{ fontWeight: 600, color: damagedQty > 0 ? '#C53030' : 'text.secondary' }}>
                           {isRejected ? '-' : (damagedQty > 0 ? damagedQty : '-')}
@@ -645,7 +660,7 @@ const Reports = () => {
                         <TableCell align="right" sx={{ fontWeight: 700, color: '#2B6CB0' }}>
                           ₹{lineApprovedTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </TableCell>
-                        <TableCell sx={{ fontStyle: isRejected ? 'italic' : 'normal', color: isRejected ? '#C53030' : 'inherit' }}>
+                        <TableCell sx={{ fontStyle: isRejected || isAgencyRejected ? 'italic' : 'normal', color: isRejected || isAgencyRejected ? '#C53030' : 'inherit' }}>
                           {remarkText}
                         </TableCell>
                       </TableRow>

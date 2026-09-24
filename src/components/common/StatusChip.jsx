@@ -5,6 +5,7 @@ const statusConfig = {
   SUBMITTED: { label: 'Submitted', color: '#D69E2E', bg: '#FEFCBF' },
   APPROVED: { label: 'Approved', color: '#2B6CB0', bg: '#EBF8FF' },
   REJECTED: { label: 'Rejected', color: '#E53E3E', bg: '#FFF5F5' },
+  REJECTED_BY_AGENCY: { label: 'Rejected by Agency', color: '#E53E3E', bg: '#FFF5F5' },
   DELIVERED: { label: 'Delivered', color: '#319795', bg: '#E6FFFA' },
   PARTIALLY_DELIVERED: { label: 'Partially Delivered', color: '#DD6B20', bg: '#FEEBC8' },
   COMPLETED: { label: 'Completed', color: '#2F855A', bg: '#F0FFF4' },
