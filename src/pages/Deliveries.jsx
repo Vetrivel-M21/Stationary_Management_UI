@@ -16,6 +16,7 @@ import * as XLSX from 'xlsx';
 import { requestService } from '../services/requestService';
 import StatusChip from '../components/common/StatusChip';
 import { formatDateTime } from '../utils/formatters';
+import { compressFileToDataUrl } from '../utils/fileCompressor';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, (c) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -177,20 +178,22 @@ const Deliveries = () => {
     });
   };
 
-  const handleFileUpload = (e) => {
+  const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Bill file size must be less than 5MB');
+    if (file.size > 20 * 1024 * 1024) {
+      setError('Bill file size must be less than 20MB');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      setBillUrl(reader.result);
-    };
-    reader.readAsDataURL(file);
+    try {
+      const dataUrl = await compressFileToDataUrl(file, 1600, 0.75);
+      setBillUrl(dataUrl);
+      setError('');
+    } catch (err) {
+      setError('Failed to process attachment: ' + err.message);
+    }
   };
 
   const totalDeliveredQty = Object.values(itemDeliveries).reduce(
@@ -612,13 +615,13 @@ const Deliveries = () => {
           />
 
           {/* Bill Attachment & Notes Upload */}
-          <Paper sx={{ p: 2, mb: 2, backgroundColor: '#F8FAFC', border: !billUrl ? '1px solid #E53E3E' : 'none' }}>
+          <Paper sx={{ p: 2, mb: 2, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#2D3748' }}>
               📄 Delivery Bill / Slip Attachment Upload: *
             </Typography>
 
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
-              <Button variant="outlined" component="label" size="small" color={!billUrl ? 'error' : 'primary'}>
+              <Button variant="outlined" component="label" size="small" color={!billUrl ? 'primary' : 'success'}>
                 Upload Bill / Slip (Image/PDF) *
                 <input type="file" hidden accept="image/*,application/pdf" onChange={handleFileUpload} />
               </Button>
@@ -628,8 +631,8 @@ const Deliveries = () => {
                 </Button>
               )}
               {!billUrl && (
-                <Typography variant="caption" color="error" sx={{ fontWeight: 600 }}>
-                  Required before dispatch
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                  * Required before dispatching
                 </Typography>
               )}
             </Box>
