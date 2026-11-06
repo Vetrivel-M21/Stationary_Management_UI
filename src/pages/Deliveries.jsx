@@ -29,6 +29,8 @@ const Deliveries = () => {
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [itemDeliveries, setItemDeliveries] = useState({});
   const [billUrl, setBillUrl] = useState('');
+  const [billFileName, setBillFileName] = useState('');
+  const [billFileSize, setBillFileSize] = useState('');
   const [billNotes, setBillNotes] = useState('');
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -107,6 +109,8 @@ const Deliveries = () => {
     setItemDeliveries(initialDeliveries);
     setDeliveryNotes('');
     setBillUrl('');
+    setBillFileName('');
+    setBillFileSize('');
     setBillNotes('');
     setError('');
     setDeliveryModalOpen(true);
@@ -182,14 +186,17 @@ const Deliveries = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (file.size > 20 * 1024 * 1024) {
-      setError('Bill file size must be less than 20MB');
+    const sizeInMB = file.size / (1024 * 1024);
+    if (file.size > 10 * 1024 * 1024) {
+      setError(`File size (${sizeInMB.toFixed(2)}MB) exceeds the 10MB limit. Please upload a file up to 4-5MB.`);
       return;
     }
 
     try {
       const dataUrl = await compressFileToDataUrl(file, 1600, 0.75);
       setBillUrl(dataUrl);
+      setBillFileName(file.name);
+      setBillFileSize(sizeInMB < 1 ? `${Math.round(file.size / 1024)} KB` : `${sizeInMB.toFixed(2)} MB`);
       setError('');
     } catch (err) {
       setError('Failed to process attachment: ' + err.message);
@@ -626,13 +633,13 @@ const Deliveries = () => {
                 <input type="file" hidden accept="image/*,application/pdf" onChange={handleFileUpload} />
               </Button>
               {billUrl && (
-                <Button variant="text" color="error" size="small" onClick={() => setBillUrl('')}>
+                <Button variant="text" color="error" size="small" onClick={() => { setBillUrl(''); setBillFileName(''); setBillFileSize(''); }}>
                   Remove Attachment
                 </Button>
               )}
               {!billUrl && (
                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                  * Required before dispatching
+                  * Required before dispatching (PDF or image up to 5MB supported)
                 </Typography>
               )}
             </Box>
@@ -643,16 +650,25 @@ const Deliveries = () => {
                   Bill Attachment Preview:
                 </Typography>
                 {billUrl.startsWith('data:application/pdf') ? (
-                  <Typography variant="body2" sx={{ color: '#2F855A', fontWeight: 600 }}>
-                    PDF Document Loaded Ready for Attachment
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="body2" sx={{ color: '#2F855A', fontWeight: 600 }}>
+                      📄 {billFileName ? billFileName : 'PDF Document Loaded'} {billFileSize ? `(${billFileSize})` : ''} — Ready for Attachment
+                    </Typography>
+                  </Box>
                 ) : (
-                  <Box
-                    component="img"
-                    src={billUrl}
-                    alt="Bill Preview"
-                    sx={{ maxHeight: 120, borderRadius: 1, border: '1px solid #CBD5E0' }}
-                  />
+                  <Box>
+                    <Box
+                      component="img"
+                      src={billUrl}
+                      alt="Bill Preview"
+                      sx={{ maxHeight: 120, borderRadius: 1, border: '1px solid #CBD5E0', display: 'block', mb: 0.5 }}
+                    />
+                    {billFileName && (
+                      <Typography variant="caption" color="text.secondary">
+                        {billFileName} {billFileSize ? `(${billFileSize})` : ''}
+                      </Typography>
+                    )}
+                  </Box>
                 )}
               </Box>
             )}

@@ -40,7 +40,16 @@ api.interceptors.response.use(
         window.location.href = '/login';
       }
     }
-    const message = error.response?.data?.message || 'An unexpected error occurred';
+    let message = error.response?.data?.message;
+    if (!message) {
+      if (error.response?.status === 413) {
+        message = 'The uploaded file/payload is too large for the server. Please ensure the file is under 4MB, or contact administrator to adjust server upload limits.';
+      } else if (error.response?.status === 502 || error.response?.status === 504) {
+        message = 'Server or gateway is unreachable. Please try again.';
+      } else {
+        message = error.message || 'An unexpected error occurred';
+      }
+    }
     return Promise.reject(new Error(message));
   }
 );
