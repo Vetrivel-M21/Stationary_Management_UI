@@ -189,6 +189,7 @@ const Deliveries = () => {
     const sizeInMB = file.size / (1024 * 1024);
     if (file.size > 10 * 1024 * 1024) {
       setError(`File size (${sizeInMB.toFixed(2)}MB) exceeds the 10MB limit. Please upload a file up to 4-5MB.`);
+      e.target.value = '';
       return;
     }
 
@@ -199,6 +200,10 @@ const Deliveries = () => {
       setBillFileSize(sizeInMB < 1 ? `${Math.round(file.size / 1024)} KB` : `${sizeInMB.toFixed(2)} MB`);
       setError('');
     } catch (err) {
+      setBillUrl('');
+      setBillFileName('');
+      setBillFileSize('');
+      e.target.value = '';
       setError('Failed to process attachment: ' + err.message);
     }
   };
